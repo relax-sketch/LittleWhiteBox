@@ -273,8 +273,32 @@
               </select>
             </div>
             <div class="form-group">
+              <label class="form-label">默认查询消息数</label>
+              <input id="ep_vk_query_messages" type="number" class="input" min="1" max="20" step="1">
+            </div>
+            <div class="form-group">
               <label class="form-label">最大召回块数</label>
               <input id="ep_vk_max" type="number" class="input" min="1" max="100" step="1">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">块大小</label>
+              <input id="ep_vk_chunk_size" type="number" class="input" min="64" max="8192" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">重叠比例 (%)</label>
+              <input id="ep_vk_overlap" type="number" class="input" min="0" max="90" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">分数预设</label>
+              <select id="ep_vk_score_preset" class="input">
+                <option value="balanced">均衡 0.25</option>
+                <option value="strict">严格 0.35</option>
+                <option value="loose">宽松 0.15</option>
+                <option value="all">全部 -1</option>
+                <option value="custom">自定义</option>
+              </select>
             </div>
             <div class="form-group">
               <label class="form-label">相似度阈值</label>
@@ -517,6 +541,21 @@
     function toNum(v, fallback = 0) {
       const n = Number(v);
       return Number.isFinite(n) ? n : fallback;
+    }
+
+    const SCORE_PRESETS = {
+      loose: 0.15,
+      balanced: 0.25,
+      strict: 0.35,
+      all: -1
+    };
+
+    function inferScorePreset(threshold, fallback = 'balanced') {
+      const n = Number(threshold);
+      for (const [key, value] of Object.entries(SCORE_PRESETS)) {
+        if (Math.abs(n - value) < 0.0001) return key;
+      }
+      return fallback === 'custom' ? 'custom' : fallback;
     }
 
     function arrToCsv(arr) { return Array.isArray(arr) ? arr.join(', ') : ''; }
@@ -797,7 +836,11 @@
       $('ep_wb_exclude_names').value = arrToCsv(cfg.worldbookExcludeNames);
       cfg.vectorKnowledge = cfg.vectorKnowledge || {};
       $('ep_vk_enabled').value = String(toBool(cfg.vectorKnowledge.enabled, false));
+      $('ep_vk_query_messages').value = String(toNum(cfg.vectorKnowledge.queryMessages, 3));
       $('ep_vk_max').value = String(toNum(cfg.vectorKnowledge.maxResults, 10));
+      $('ep_vk_chunk_size').value = String(toNum(cfg.vectorKnowledge.chunkSize, 768));
+      $('ep_vk_overlap').value = String(toNum(cfg.vectorKnowledge.overlapPercent, 0));
+      $('ep_vk_score_preset').value = cfg.vectorKnowledge.scorePreset || inferScorePreset(cfg.vectorKnowledge.scoreThreshold, 'balanced');
       $('ep_vk_threshold').value = String(toNum(cfg.vectorKnowledge.scoreThreshold, 0.25));
       $('ep_vk_instruction_enabled').value = String(toBool(cfg.vectorKnowledge.queryInstructionEnabled, true));
       $('ep_vk_instruction').value = cfg.vectorKnowledge.queryInstruction || '';
@@ -846,7 +889,11 @@
       p.worldbookExcludeNames = csvToArr($('ep_wb_exclude_names').value);
       p.vectorKnowledge = {
         enabled: toBool($('ep_vk_enabled').value, false),
+        queryMessages: Math.max(1, Math.min(20, Math.floor(toNum($('ep_vk_query_messages').value, 3)))),
         maxResults: Math.max(1, Math.min(100, Math.floor(toNum($('ep_vk_max').value, 10)))),
+        chunkSize: Math.max(64, Math.min(8192, Math.floor(toNum($('ep_vk_chunk_size').value, 768)))),
+        overlapPercent: Math.max(0, Math.min(90, Math.floor(toNum($('ep_vk_overlap').value, 0)))),
+        scorePreset: $('ep_vk_score_preset').value || 'balanced',
         scoreThreshold: toNum($('ep_vk_threshold').value, 0.25),
         selectedTaskRefs: Array.isArray(cfg?.vectorKnowledge?.selectedTaskRefs) ? cfg.vectorKnowledge.selectedTaskRefs : [],
         queryInstructionEnabled: toBool($('ep_vk_instruction_enabled').value, true),
@@ -896,6 +943,16 @@
 
       $('ep_prefix_mode').addEventListener('change', updatePrefixModeUI);
       $('ep_vk_refresh_tasks').addEventListener('click', () => post('xb-ena:vector-tasks-request'));
+      $('ep_vk_score_preset').addEventListener('change', () => {
+        const preset = $('ep_vk_score_preset').value;
+        if (preset !== 'custom' && Object.prototype.hasOwnProperty.call(SCORE_PRESETS, preset)) {
+          $('ep_vk_threshold').value = String(SCORE_PRESETS[preset]);
+        }
+        scheduleSave();
+      });
+      $('ep_vk_threshold').addEventListener('input', () => {
+        $('ep_vk_score_preset').value = inferScorePreset($('ep_vk_threshold').value, 'custom');
+      });
 
       $('ep_fetch_models').addEventListener('click', () => {
         post('xb-ena:fetch-models');
