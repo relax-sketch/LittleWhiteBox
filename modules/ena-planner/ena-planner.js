@@ -47,11 +47,7 @@ function getDefaultSettings() {
         // Vectors Enhanced knowledge recall for planner context
         vectorKnowledge: {
             enabled: false,
-            queryMessages: 3,
             maxResults: 10,
-            chunkSize: 768,
-            overlapPercent: 0,
-            scorePreset: 'balanced',
             scoreThreshold: 0.25,
             selectedTaskRefs: [],
             queryInstructionEnabled: true,
@@ -130,18 +126,14 @@ function ensureSettings() {
     deepMerge(s, d);
     if (!Array.isArray(s.responseKeepTags)) s.responseKeepTags = structuredClone(d.responseKeepTags);
     else s.responseKeepTags = normalizeResponseKeepTags(s.responseKeepTags);
-        if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
-        else {
-            const vk = s.vectorKnowledge;
-            if (!Array.isArray(vk.selectedTaskRefs)) vk.selectedTaskRefs = [];
-            vk.queryMessages = Math.max(1, Math.min(20, Math.floor(Number(vk.queryMessages) || d.vectorKnowledge.queryMessages)));
-            vk.maxResults = Math.max(1, Math.min(100, Math.floor(Number(vk.maxResults) || d.vectorKnowledge.maxResults)));
-            vk.chunkSize = Math.max(64, Math.min(8192, Math.floor(Number(vk.chunkSize) || d.vectorKnowledge.chunkSize)));
-            vk.overlapPercent = Math.max(0, Math.min(90, Math.floor(Number(vk.overlapPercent) || d.vectorKnowledge.overlapPercent)));
-            if (!['loose', 'balanced', 'strict', 'all', 'custom'].includes(vk.scorePreset)) vk.scorePreset = d.vectorKnowledge.scorePreset;
-            vk.scoreThreshold = Number.isFinite(Number(vk.scoreThreshold)) ? Number(vk.scoreThreshold) : d.vectorKnowledge.scoreThreshold;
-            if (!String(vk.queryInstruction || '').trim()) vk.queryInstruction = d.vectorKnowledge.queryInstruction;
-            if (!String(vk.template || '').trim()) vk.template = d.vectorKnowledge.template;
+    if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
+    else {
+        const vk = s.vectorKnowledge;
+        if (!Array.isArray(vk.selectedTaskRefs)) vk.selectedTaskRefs = [];
+        vk.maxResults = Math.max(1, Math.min(100, Math.floor(Number(vk.maxResults) || d.vectorKnowledge.maxResults)));
+        vk.scoreThreshold = Number.isFinite(Number(vk.scoreThreshold)) ? Number(vk.scoreThreshold) : d.vectorKnowledge.scoreThreshold;
+        if (!String(vk.queryInstruction || '').trim()) vk.queryInstruction = d.vectorKnowledge.queryInstruction;
+        if (!String(vk.template || '').trim()) vk.template = d.vectorKnowledge.template;
     }
 
     // Migration: remove old keys that are no longer needed
@@ -420,26 +412,9 @@ function applyVectorKnowledgeTemplate(template, text) {
     return `${rawTemplate}\n${body}`.trim();
 }
 
-function collectPlannerVectorQueryMessages(chat, maxMessages) {
-    const count = Math.max(1, Math.min(20, Math.floor(Number(maxMessages) || 3)));
-    if (!Array.isArray(chat) || !chat.length) return '';
-    return chat
-        .filter(m => !m?.is_system && !m?.extra?.hidden)
-        .slice(-count)
-        .map(m => {
-            const name = m?.name || (m?.is_user ? 'user' : 'assistant');
-            const text = String(m?.mes || '').trim();
-            return text ? `[${name}] ${text}` : '';
-        })
-        .filter(Boolean)
-        .join('\n');
-}
-
-function buildPlannerVectorQuery(rawUserInput, parts = {}, queryMessages = 3) {
+function buildPlannerVectorQuery(rawUserInput, parts = {}) {
     const chunks = [];
-    const queryHistory = collectPlannerVectorQueryMessages(parts.chat, queryMessages);
-    if (queryHistory) chunks.push(`<query_recent_messages>\n${queryHistory}\n</query_recent_messages>`);
-    else if (parts.recentChatRaw) chunks.push(parts.recentChatRaw);
+    if (parts.recentChatRaw) chunks.push(parts.recentChatRaw);
     if (parts.plotsRaw) chunks.push(parts.plotsRaw);
     chunks.push(`玩家最新输入:\n${rawUserInput || ''}`);
     return chunks.map(x => String(x || '').trim()).filter(Boolean).join('\n\n');
@@ -456,12 +431,8 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
     }
 
     const result = await api({
-        queryText: buildPlannerVectorQuery(rawUserInput, parts, vk.queryMessages),
-        queryMessages: vk.queryMessages,
+        queryText: buildPlannerVectorQuery(rawUserInput, parts),
         maxResults: vk.maxResults,
-        chunkSize: vk.chunkSize,
-        overlapPercent: vk.overlapPercent,
-        scorePreset: vk.scorePreset,
         scoreThreshold: vk.scoreThreshold,
         selectedTaskRefs: Array.isArray(vk.selectedTaskRefs) ? vk.selectedTaskRefs : [],
         queryInstructionEnabled: !!vk.queryInstructionEnabled,
@@ -1284,7 +1255,7 @@ async function buildPlannerMessages(rawUserInput) {
     let vectorKnowledgeError = '';
     try {
         const result = await runWithTimeout(
-            () => buildVectorsEnhancedKnowledge(rawUserInput, { recentChatRaw, plotsRaw, chat }),
+            () => buildVectorsEnhancedKnowledge(rawUserInput, { recentChatRaw, plotsRaw }),
             VECTOR_RECALL_TIMEOUT_MS,
             `剧情规划向量知识库召回超时（>${Math.floor(VECTOR_RECALL_TIMEOUT_MS / 1000)}s）`
         );
