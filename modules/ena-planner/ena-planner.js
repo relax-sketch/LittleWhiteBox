@@ -44,6 +44,17 @@ function getDefaultSettings() {
         // Planner response tags to keep, in source order (empty = keep full response)
         responseKeepTags: ['plot', 'note', 'plot-log', 'state'],
 
+        // Vectors Enhanced knowledge recall for planner context
+        vectorKnowledge: {
+            enabled: false,
+            maxResults: 10,
+            scoreThreshold: 0.25,
+            selectedTaskRefs: [],
+            queryInstructionEnabled: true,
+            queryInstruction: 'Given a story planning query, retrieve plot-relevant passages, setting details, character facts, foreshadowing, and prior events that help decide the next narrative move.',
+            template: '<planner_vector_knowledge>\n{{text}}\n</planner_vector_knowledge>',
+        },
+
         // Planner prompts (designer)
         promptBlocks: structuredClone(DEFAULT_PROMPT_BLOCKS),
         // Saved prompt templates: { name: promptBlocks[] }
@@ -115,6 +126,15 @@ function ensureSettings() {
     deepMerge(s, d);
     if (!Array.isArray(s.responseKeepTags)) s.responseKeepTags = structuredClone(d.responseKeepTags);
     else s.responseKeepTags = normalizeResponseKeepTags(s.responseKeepTags);
+    if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
+    else {
+        const vk = s.vectorKnowledge;
+        if (!Array.isArray(vk.selectedTaskRefs)) vk.selectedTaskRefs = [];
+        vk.maxResults = Math.max(1, Math.min(100, Math.floor(Number(vk.maxResults) || d.vectorKnowledge.maxResults)));
+        vk.scoreThreshold = Number.isFinite(Number(vk.scoreThreshold)) ? Number(vk.scoreThreshold) : d.vectorKnowledge.scoreThreshold;
+        if (!String(vk.queryInstruction || '').trim()) vk.queryInstruction = d.vectorKnowledge.queryInstruction;
+        if (!String(vk.template || '').trim()) vk.template = d.vectorKnowledge.template;
+    }
 
     // Migration: remove old keys that are no longer needed
     delete s.includeCharacterLorebooks;
@@ -382,6 +402,79 @@ function getCachedStorySummary() {
     }
 
     return '';
+}
+
+function applyVectorKnowledgeTemplate(template, text) {
+    const body = String(text || '').trim();
+    if (!body) return '';
+    const rawTemplate = String(template || '<planner_vector_knowledge>\n{{text}}\n</planner_vector_knowledge>');
+    if (rawTemplate.includes('{{text}}')) return rawTemplate.replaceAll('{{text}}', body);
+    return `${rawTemplate}\n${body}`.trim();
+}
+
+function buildPlannerVectorQuery(rawUserInput, parts = {}) {
+    const chunks = [];
+    if (parts.recentChatRaw) chunks.push(parts.recentChatRaw);
+    if (parts.plotsRaw) chunks.push(parts.plotsRaw);
+    chunks.push(`玩家最新输入:\n${rawUserInput || ''}`);
+    return chunks.map(x => String(x || '').trim()).filter(Boolean).join('\n\n');
+}
+
+async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
+    const s = ensureSettings();
+    const vk = s.vectorKnowledge || {};
+    if (!vk.enabled) return { text: '', stats: null, error: '' };
+
+    const api = window.VectorsEnhanced?.queryForPrompt;
+    if (typeof api !== 'function') {
+        return { text: '', stats: null, error: 'Vectors Enhanced 查询接口不可用' };
+    }
+
+    const result = await api({
+        queryText: buildPlannerVectorQuery(rawUserInput, parts),
+        maxResults: vk.maxResults,
+        scoreThreshold: vk.scoreThreshold,
+        selectedTaskRefs: Array.isArray(vk.selectedTaskRefs) ? vk.selectedTaskRefs : [],
+        queryInstructionEnabled: !!vk.queryInstructionEnabled,
+        queryInstruction: vk.queryInstruction,
+        template: '{{text}}',
+    });
+
+    const raw = String(result?.text || result?.rawText || '').trim();
+    if (!raw) return { text: '', stats: result?.stats || null, error: '' };
+    return {
+        text: applyVectorKnowledgeTemplate(vk.template, raw),
+        stats: result?.stats || null,
+        error: '',
+    };
+}
+
+function getVectorsEnhancedTaskOptionsForUi() {
+    const api = window.VectorsEnhanced?.getPlannerTaskOptions;
+    if (typeof api === 'function') {
+        try {
+            const tasks = api();
+            return Array.isArray(tasks) ? tasks : [];
+        } catch (e) {
+            console.warn('[EnaPlanner] Failed to read Vectors Enhanced task API:', e);
+        }
+    }
+
+    const ctx = getContextSafe();
+    const chatId = ctx?.chatId || '';
+    const ve = extension_settings?.vectors_enhanced;
+    const local = chatId && Array.isArray(ve?.vector_tasks?.[chatId]) ? ve.vector_tasks[chatId] : [];
+    return local.map(task => ({
+        ref: `${task.ownerChatId || chatId}::${task.taskId}`,
+        taskId: task.taskId,
+        name: task.name || task.taskId,
+        enabled: !!task.enabled,
+        global: !!task.global,
+        external: task.type === 'external',
+        orphaned: !!task.orphaned,
+        ownerChatId: task.ownerChatId || chatId,
+        weight: Number(task.vectorQueryWeight ?? 1) || 0,
+    }));
 }
 
 /**
@@ -1157,7 +1250,23 @@ async function buildPlannerMessages(rawUserInput) {
     const recentChatRaw = collectRecentChatSnippet(chat, 2);
 
     const plotsRaw = formatPlotsBlock(extractLastNPlots(chat, s.plotCount));
-    const vectorRaw = '';
+    let vectorRaw = '';
+    let vectorKnowledgeStats = null;
+    let vectorKnowledgeError = '';
+    try {
+        const result = await runWithTimeout(
+            () => buildVectorsEnhancedKnowledge(rawUserInput, { recentChatRaw, plotsRaw }),
+            VECTOR_RECALL_TIMEOUT_MS,
+            `剧情规划向量知识库召回超时（>${Math.floor(VECTOR_RECALL_TIMEOUT_MS / 1000)}s）`
+        );
+        vectorRaw = result?.text || '';
+        vectorKnowledgeStats = result?.stats || null;
+        vectorKnowledgeError = result?.error || '';
+        if (vectorKnowledgeError) console.warn('[Ena] Vectors Enhanced knowledge skipped:', vectorKnowledgeError);
+    } catch (e) {
+        vectorKnowledgeError = String(e?.message ?? e);
+        console.warn('[Ena] Vectors Enhanced knowledge recall failed:', e);
+    }
 
     // Build scanText for worldbook keyword activation
     const scanText = [charBlockRaw, recentChatRaw, vectorRaw, plotsRaw, rawUserInput].join('\n\n');
@@ -1202,8 +1311,7 @@ async function buildPlannerMessages(rawUserInput) {
         messages.push({ role: 'system', content: `<story_summary>\n${storySummary}\n</story_summary>` });
     }
 
-    // 5) Vector recall — merged into story_summary above, kept for compatibility
-    // (vectorRaw is empty; this block intentionally does nothing)
+    // 5) Vectors Enhanced knowledge recall for the planner
     if (String(vector).trim()) messages.push({ role: 'system', content: vector });
 
     // 6) Previous plots
@@ -1227,7 +1335,19 @@ async function buildPlannerMessages(rawUserInput) {
 
     const finalMessages = s.mergeConsecutiveSystemMessages ? mergeConsecutiveSystemMessages(messages) : messages;
 
-    return { messages: finalMessages, meta: { charBlockRaw, worldbookRaw, recentChatRaw, vectorRaw, cachedSummaryLen: cachedSummary.length, plotsRaw } };
+    return {
+        messages: finalMessages,
+        meta: {
+            charBlockRaw,
+            worldbookRaw,
+            recentChatRaw,
+            vectorRaw,
+            vectorKnowledgeStats,
+            vectorKnowledgeError,
+            cachedSummaryLen: cachedSummary.length,
+            plotsRaw,
+        },
+    };
 }
 
 /**
@@ -1492,6 +1612,11 @@ async function handleIframeMessage(ev) {
             await saveConfigNow();
             postToIframe(iframe, { type: 'xb-ena:logs', payload: { logs: state.logs } });
             break;
+        case 'xb-ena:vector-tasks-request': {
+            const tasks = getVectorsEnhancedTaskOptionsForUi();
+            postToIframe(iframe, { type: 'xb-ena:vector-tasks', payload: { tasks } });
+            break;
+        }
         case 'xb-ena:fetch-models': {
             try {
                 const models = await fetchModelsForUi();

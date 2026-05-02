@@ -510,6 +510,72 @@ textarea.input {
   border-radius: var(--radius);
 }
 
+.vector-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius);
+}
+
+.vector-task-empty {
+  color: var(--txt3);
+  font-size: .75rem;
+  padding: 10px 4px;
+}
+
+.vector-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--bdr2);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.vector-task-item.muted {
+  opacity: .65;
+}
+
+.vector-task-item input {
+  margin-top: 4px;
+}
+
+.vector-task-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.vector-task-name {
+  display: block;
+  color: var(--txt);
+  font-size: .8125rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.vector-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.vector-task-meta span {
+  font-size: .625rem;
+  line-height: 1;
+  color: var(--txt3);
+  border: 1px solid var(--bdr);
+  border-radius: 999px;
+  padding: 3px 6px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Undo Bar
    ═══════════════════════════════════════════════════════════════════════════ */
