@@ -94,6 +94,7 @@ const state = {
     isPlanning: false,
     bypassNextSend: false,
     lastInjectedText: '',
+    vectorKnowledgeSuccessNotified: false,
     logs: []
 };
 
@@ -450,6 +451,16 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
 
     const raw = String(result?.text || result?.rawText || '').trim();
     if (!raw) return { text: '', stats: result?.stats || null, error: '' };
+    if (!state.vectorKnowledgeSuccessNotified) {
+        const stats = result?.stats || {};
+        const finalCount = Number(stats.finalCount || 0);
+        const originalCount = Number(stats.originalQueryCount || 0);
+        const countText = finalCount > 0
+            ? `返回 ${finalCount} 块${originalCount && originalCount !== finalCount ? `（原始命中 ${originalCount}）` : ''}`
+            : '已返回内容';
+        toastInfo(`剧情规划向量知识库召回成功：${countText}`);
+        state.vectorKnowledgeSuccessNotified = true;
+    }
     return {
         text: applyVectorKnowledgeTemplate(vk.template, raw),
         stats: result?.stats || null,
