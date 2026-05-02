@@ -412,12 +412,20 @@ function applyVectorKnowledgeTemplate(template, text) {
     return `${rawTemplate}\n${body}`.trim();
 }
 
+async function waitForVectorsEnhancedApi(methodName, timeoutMs = 3000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        const api = window.VectorsEnhanced?.[methodName];
+        if (typeof api === 'function') return api;
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return null;
+}
+
 function buildPlannerVectorQuery(rawUserInput, parts = {}) {
-    const chunks = [];
-    if (parts.recentChatRaw) chunks.push(parts.recentChatRaw);
-    if (parts.plotsRaw) chunks.push(parts.plotsRaw);
-    chunks.push(`玩家最新输入:\n${rawUserInput || ''}`);
-    return chunks.map(x => String(x || '').trim()).filter(Boolean).join('\n\n');
+    const input = String(rawUserInput || '').trim();
+    if (input) return input;
+    return String(parts?.fallback || '').trim();
 }
 
 async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
@@ -425,7 +433,7 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
     const vk = s.vectorKnowledge || {};
     if (!vk.enabled) return { text: '', stats: null, error: '' };
 
-    const api = window.VectorsEnhanced?.queryForPrompt;
+    const api = await waitForVectorsEnhancedApi('queryForPrompt');
     if (typeof api !== 'function') {
         return { text: '', stats: null, error: 'Vectors Enhanced 查询接口不可用' };
     }
@@ -1179,7 +1187,7 @@ function debugCharForUi() {
 async function debugVectorKnowledgeForUi() {
     const s = ensureSettings();
     const vk = s.vectorKnowledge || {};
-    const api = window.VectorsEnhanced?.diagnosePlannerQuery;
+    const api = await waitForVectorsEnhancedApi('diagnosePlannerQuery');
     if (typeof api !== 'function') {
         const tasks = getVectorsEnhancedTaskOptionsForUi();
         return [
@@ -1195,15 +1203,13 @@ async function debugVectorKnowledgeForUi() {
 
     const ctx = getContextSafe();
     const chat = ctx?.chat ?? window.SillyTavern?.chat ?? [];
-    const lastMessages = Array.isArray(chat)
-        ? chat
-            .filter(m => !m?.is_system && !m?.extra?.hidden)
-            .slice(-3)
-            .map(m => String(m?.mes || '').trim())
-            .filter(Boolean)
-            .join('\n')
+    const draftInput = String(document.getElementById('send_textarea')?.value || '').trim();
+    const lastUserInput = Array.isArray(chat)
+        ? [...chat]
+            .reverse()
+            .find(m => m?.is_user && !m?.is_system && !m?.extra?.hidden)?.mes
         : '';
-    const testQuery = lastMessages || '测试剧情规划向量知识库召回';
+    const testQuery = draftInput || String(lastUserInput || '').trim() || '测试剧情规划向量知识库召回';
 
     return await api({
         queryText: testQuery,
