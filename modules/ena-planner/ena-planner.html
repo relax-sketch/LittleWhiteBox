@@ -285,11 +285,13 @@
             <label class="form-label">知识库任务</label>
             <div class="btn-group" style="margin-bottom:8px;">
               <button id="ep_vk_refresh_tasks" class="btn" type="button">刷新任务列表</button>
+              <button id="ep_vk_diagnose" class="btn" type="button">诊断向量知识库</button>
             </div>
             <div id="ep_vk_task_list" class="vector-task-list">
               <div class="vector-task-empty">暂无任务；将使用当前聊天中已启用的 vectors-enhanced 任务</div>
             </div>
             <p class="form-hint">不勾选时使用当前聊天中所有已启用任务；勾选后只查询选中的任务。</p>
+            <pre id="ep_vk_diagnose_output" class="debug-output"></pre>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -896,6 +898,12 @@
 
       $('ep_prefix_mode').addEventListener('change', updatePrefixModeUI);
       $('ep_vk_refresh_tasks').addEventListener('click', () => post('xb-ena:vector-tasks-request'));
+      $('ep_vk_diagnose').addEventListener('click', () => {
+        const out = $('ep_vk_diagnose_output');
+        out.classList.add('visible');
+        out.textContent = '诊断中…';
+        post('xb-ena:debug-vector-knowledge');
+      });
 
       $('ep_fetch_models').addEventListener('click', () => {
         post('xb-ena:fetch-models');
@@ -1068,6 +1076,10 @@
           const out = $('ep_debug_output');
           out.classList.add('visible');
           out.textContent = String(payload?.output || '');
+          const vkOut = $('ep_vk_diagnose_output');
+          if (vkOut?.classList.contains('visible') && vkOut.textContent === '诊断中…') {
+            vkOut.textContent = String(payload?.output || '');
+          }
           break;
         }
       }

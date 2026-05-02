@@ -1176,6 +1176,45 @@ function debugCharForUi() {
     ].join('\n');
 }
 
+async function debugVectorKnowledgeForUi() {
+    const s = ensureSettings();
+    const vk = s.vectorKnowledge || {};
+    const api = window.VectorsEnhanced?.diagnosePlannerQuery;
+    if (typeof api !== 'function') {
+        const tasks = getVectorsEnhancedTaskOptionsForUi();
+        return [
+            'Vectors Enhanced 诊断接口不可用。',
+            `window.VectorsEnhanced: ${!!window.VectorsEnhanced}`,
+            `queryForPrompt: ${typeof window.VectorsEnhanced?.queryForPrompt}`,
+            `getPlannerTaskOptions: ${typeof window.VectorsEnhanced?.getPlannerTaskOptions}`,
+            `可见任务数: ${tasks.length}`,
+            '',
+            '请确认 vectors-enhanced 已加载到当前酒馆页面，并已更新到包含诊断接口的版本。',
+        ].join('\n');
+    }
+
+    const ctx = getContextSafe();
+    const chat = ctx?.chat ?? window.SillyTavern?.chat ?? [];
+    const lastMessages = Array.isArray(chat)
+        ? chat
+            .filter(m => !m?.is_system && !m?.extra?.hidden)
+            .slice(-3)
+            .map(m => String(m?.mes || '').trim())
+            .filter(Boolean)
+            .join('\n')
+        : '';
+    const testQuery = lastMessages || '测试剧情规划向量知识库召回';
+
+    return await api({
+        queryText: testQuery,
+        maxResults: vk.maxResults,
+        scoreThreshold: vk.scoreThreshold,
+        selectedTaskRefs: Array.isArray(vk.selectedTaskRefs) ? vk.selectedTaskRefs : [],
+        queryInstructionEnabled: !!vk.queryInstructionEnabled,
+        queryInstruction: vk.queryInstruction,
+    });
+}
+
 /**
  * -------------------------
  * Build planner messages
@@ -1638,6 +1677,15 @@ async function handleIframeMessage(ev) {
         case 'xb-ena:debug-char': {
             const output = debugCharForUi();
             postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output } });
+            break;
+        }
+        case 'xb-ena:debug-vector-knowledge': {
+            try {
+                const output = await debugVectorKnowledgeForUi();
+                postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output } });
+            } catch (err) {
+                postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output: String(err?.stack || err?.message || err) } });
+            }
             break;
         }
     }
