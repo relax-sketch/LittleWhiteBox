@@ -264,51 +264,15 @@
 
         <section class="card">
           <div class="card-title">向量知识库</div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">调用 vectors-enhanced</label>
-              <select id="ep_vk_enabled" class="input">
-                <option value="false">关闭</option>
-                <option value="true">开启</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">最大召回块数</label>
-              <input id="ep_vk_max" type="number" class="input" min="1" max="100" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">相似度阈值</label>
-              <input id="ep_vk_threshold" type="number" class="input" min="-1" max="1" step="0.01">
-            </div>
-          </div>
           <div class="form-group">
-            <label class="form-label">知识库任务</label>
-            <div class="btn-group" style="margin-bottom:8px;">
-              <button id="ep_vk_refresh_tasks" class="btn" type="button">刷新任务列表</button>
-              <button id="ep_vk_diagnose" class="btn" type="button">诊断向量知识库</button>
-            </div>
-            <div id="ep_vk_task_list" class="vector-task-list">
-              <div class="vector-task-empty">暂无任务；将使用当前聊天中已启用的 vectors-enhanced 任务</div>
-            </div>
-            <p class="form-hint">不勾选时使用当前聊天中所有已启用任务；勾选后只查询选中的任务。</p>
+            <label class="form-label">调用聊天记录管理器</label>
+            <select id="ep_vk_enabled" class="input">
+              <option value="false">关闭</option>
+              <option value="true">开启</option>
+            </select>
+            <p class="form-hint">剧情规划会把玩家最新输入当作普通查询，直接使用聊天记录管理器当前的任务、阈值、召回数量、查询指令和重排设置。</p>
+            <button id="ep_vk_diagnose" class="btn" type="button">诊断聊天记录管理器查询</button>
             <pre id="ep_vk_diagnose_output" class="debug-output"></pre>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">查询指令</label>
-              <select id="ep_vk_instruction_enabled" class="input">
-                <option value="true">开启</option>
-                <option value="false">关闭</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <textarea id="ep_vk_instruction" class="input" rows="3" placeholder="告诉向量库优先检索哪些剧情资料..."></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">注入模板</label>
-            <textarea id="ep_vk_template" class="input" rows="4" placeholder="<planner_vector_knowledge>{{text}}</planner_vector_knowledge>"></textarea>
-            <p class="form-hint">使用 {{text}} 表示召回内容。结果只会进入剧情规划请求，不会直接注入主聊天。</p>
           </div>
         </section>
 
@@ -413,7 +377,6 @@
     let undoState = null;
     let undoPending = false;
     let fetchedModels = [];
-    let vectorTasks = [];
 
     /* ── Save indicator ── */
 
@@ -684,42 +647,6 @@
       $('ep_model_selector').classList.remove('hidden');
     }
 
-    function renderVectorTaskList() {
-      const list = $('ep_vk_task_list');
-      if (!list) return;
-      const selected = new Set(cfg?.vectorKnowledge?.selectedTaskRefs || []);
-      if (!Array.isArray(vectorTasks) || !vectorTasks.length) {
-        list.innerHTML = '<div class="vector-task-empty">暂无任务；将使用当前聊天中已启用的 vectors-enhanced 任务</div>';
-        return;
-      }
-      list.innerHTML = vectorTasks.map(task => {
-        const ref = escapeHtml(task.ref || '');
-        const name = escapeHtml(task.name || task.taskId || task.collectionId || '未命名任务');
-        const badges = [
-          task.enabled ? '启用' : '关闭',
-          task.global ? '全局' : '',
-          task.external ? '外挂' : '',
-          task.orphaned ? '失效' : ''
-        ].filter(Boolean).map(x => `<span>${escapeHtml(x)}</span>`).join('');
-        return `<label class="vector-task-item ${task.enabled ? '' : 'muted'}">
-          <input type="checkbox" data-ref="${ref}" ${selected.has(task.ref) ? 'checked' : ''}>
-          <span class="vector-task-main">
-            <span class="vector-task-name">${name}</span>
-            <span class="vector-task-meta">${badges}</span>
-          </span>
-        </label>`;
-      }).join('');
-      list.querySelectorAll('input[type="checkbox"]').forEach(input => {
-        input.addEventListener('change', () => {
-          cfg.vectorKnowledge = cfg.vectorKnowledge || {};
-          cfg.vectorKnowledge.selectedTaskRefs = Array.from(list.querySelectorAll('input[type="checkbox"]:checked'))
-            .map(el => el.dataset.ref)
-            .filter(Boolean);
-          scheduleSave();
-        });
-      });
-    }
-
     /* ── Logs ── */
 
     function renderLogs() {
@@ -799,11 +726,6 @@
       $('ep_wb_exclude_names').value = arrToCsv(cfg.worldbookExcludeNames);
       cfg.vectorKnowledge = cfg.vectorKnowledge || {};
       $('ep_vk_enabled').value = String(toBool(cfg.vectorKnowledge.enabled, false));
-      $('ep_vk_max').value = String(toNum(cfg.vectorKnowledge.maxResults, 10));
-      $('ep_vk_threshold').value = String(toNum(cfg.vectorKnowledge.scoreThreshold, 0.25));
-      $('ep_vk_instruction_enabled').value = String(toBool(cfg.vectorKnowledge.queryInstructionEnabled, true));
-      $('ep_vk_instruction').value = cfg.vectorKnowledge.queryInstruction || '';
-      $('ep_vk_template').value = cfg.vectorKnowledge.template || '<planner_vector_knowledge>\n{{text}}\n</planner_vector_knowledge>';
       $('ep_plot_n').value = String(toNum(cfg.plotCount, 2));
       $('ep_keep_tags').value = arrToCsv(cfg.responseKeepTags || ['plot', 'note', 'plot-log', 'state']);
       $('ep_exclude_tags').value = arrToCsv(cfg.chatExcludeTags);
@@ -816,7 +738,6 @@
       const keepSelectedTemplate = cfg?.activePromptTemplate || $('ep_tpl_select')?.value || '';
       renderTemplateSelect(keepSelectedTemplate);
       renderPromptList();
-      renderVectorTaskList();
       renderLogs();
     }
 
@@ -848,12 +769,6 @@
       p.worldbookExcludeNames = csvToArr($('ep_wb_exclude_names').value);
       p.vectorKnowledge = {
         enabled: toBool($('ep_vk_enabled').value, false),
-        maxResults: Math.max(1, Math.min(100, Math.floor(toNum($('ep_vk_max').value, 10)))),
-        scoreThreshold: toNum($('ep_vk_threshold').value, 0.25),
-        selectedTaskRefs: Array.isArray(cfg?.vectorKnowledge?.selectedTaskRefs) ? cfg.vectorKnowledge.selectedTaskRefs : [],
-        queryInstructionEnabled: toBool($('ep_vk_instruction_enabled').value, true),
-        queryInstruction: $('ep_vk_instruction').value.trim(),
-        template: $('ep_vk_template').value.trim()
       };
       p.plotCount = Math.max(0, Math.floor(toNum($('ep_plot_n').value, 2)));
       p.responseKeepTags = normalizeKeepTagsInput($('ep_keep_tags').value);
@@ -897,7 +812,6 @@
       });
 
       $('ep_prefix_mode').addEventListener('change', updatePrefixModeUI);
-      $('ep_vk_refresh_tasks').addEventListener('click', () => post('xb-ena:vector-tasks-request'));
       $('ep_vk_diagnose').addEventListener('click', () => {
         const out = $('ep_vk_diagnose_output');
         out.classList.add('visible');
@@ -1067,10 +981,6 @@
         }
         case 'xb-ena:models-error':
           setLocalStatus('ep_api_status', payload?.message || '拉取模型失败', 'error');
-          break;
-        case 'xb-ena:vector-tasks':
-          vectorTasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
-          renderVectorTaskList();
           break;
         case 'xb-ena:debug-output': {
           const out = $('ep_debug_output');

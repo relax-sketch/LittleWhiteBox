@@ -47,12 +47,6 @@ function getDefaultSettings() {
         // Vectors Enhanced knowledge recall for planner context
         vectorKnowledge: {
             enabled: false,
-            maxResults: 10,
-            scoreThreshold: 0.25,
-            selectedTaskRefs: [],
-            queryInstructionEnabled: true,
-            queryInstruction: 'Given a story planning query, retrieve plot-relevant passages, setting details, character facts, foreshadowing, and prior events that help decide the next narrative move.',
-            template: '<planner_vector_knowledge>\n{{text}}\n</planner_vector_knowledge>',
         },
 
         // Planner prompts (designer)
@@ -130,11 +124,13 @@ function ensureSettings() {
     if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
     else {
         const vk = s.vectorKnowledge;
-        if (!Array.isArray(vk.selectedTaskRefs)) vk.selectedTaskRefs = [];
-        vk.maxResults = Math.max(1, Math.min(100, Math.floor(Number(vk.maxResults) || d.vectorKnowledge.maxResults)));
-        vk.scoreThreshold = Number.isFinite(Number(vk.scoreThreshold)) ? Number(vk.scoreThreshold) : d.vectorKnowledge.scoreThreshold;
-        if (!String(vk.queryInstruction || '').trim()) vk.queryInstruction = d.vectorKnowledge.queryInstruction;
-        if (!String(vk.template || '').trim()) vk.template = d.vectorKnowledge.template;
+        vk.enabled = !!vk.enabled;
+        delete vk.maxResults;
+        delete vk.scoreThreshold;
+        delete vk.selectedTaskRefs;
+        delete vk.queryInstructionEnabled;
+        delete vk.queryInstruction;
+        delete vk.template;
     }
 
     // Migration: remove old keys that are no longer needed
@@ -405,12 +401,10 @@ function getCachedStorySummary() {
     return '';
 }
 
-function applyVectorKnowledgeTemplate(template, text) {
+function applyVectorKnowledgeTemplate(text) {
     const body = String(text || '').trim();
     if (!body) return '';
-    const rawTemplate = String(template || '<planner_vector_knowledge>\n{{text}}\n</planner_vector_knowledge>');
-    if (rawTemplate.includes('{{text}}')) return rawTemplate.replaceAll('{{text}}', body);
-    return `${rawTemplate}\n${body}`.trim();
+    return `<planner_vector_knowledge>\n${body}\n</planner_vector_knowledge>`;
 }
 
 async function waitForVectorsEnhancedApi(methodName, timeoutMs = 3000) {
@@ -441,11 +435,6 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
 
     const result = await api({
         queryText: buildPlannerVectorQuery(rawUserInput, parts),
-        maxResults: vk.maxResults,
-        scoreThreshold: vk.scoreThreshold,
-        selectedTaskRefs: Array.isArray(vk.selectedTaskRefs) ? vk.selectedTaskRefs : [],
-        queryInstructionEnabled: !!vk.queryInstructionEnabled,
-        queryInstruction: vk.queryInstruction,
         template: '{{text}}',
     });
 
@@ -462,7 +451,7 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
         state.vectorKnowledgeSuccessNotified = true;
     }
     return {
-        text: applyVectorKnowledgeTemplate(vk.template, raw),
+        text: applyVectorKnowledgeTemplate(raw),
         stats: result?.stats || null,
         error: '',
     };
@@ -1196,8 +1185,6 @@ function debugCharForUi() {
 }
 
 async function debugVectorKnowledgeForUi() {
-    const s = ensureSettings();
-    const vk = s.vectorKnowledge || {};
     const api = await waitForVectorsEnhancedApi('diagnosePlannerQuery');
     if (typeof api !== 'function') {
         const tasks = getVectorsEnhancedTaskOptionsForUi();
@@ -1224,11 +1211,6 @@ async function debugVectorKnowledgeForUi() {
 
     return await api({
         queryText: testQuery,
-        maxResults: vk.maxResults,
-        scoreThreshold: vk.scoreThreshold,
-        selectedTaskRefs: Array.isArray(vk.selectedTaskRefs) ? vk.selectedTaskRefs : [],
-        queryInstructionEnabled: !!vk.queryInstructionEnabled,
-        queryInstruction: vk.queryInstruction,
     });
 }
 
