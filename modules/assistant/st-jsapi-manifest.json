@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-26T08:40:19.304Z",
+  "generatedAt": "2026-05-07T09:58:45.114Z",
   "version": 1,
   "sourceEntryCount": 160,
   "namespaces": {
@@ -260,6 +260,23 @@
         "st.slash.SlashCommandEnumValue",
         "st.slash.SlashCommandNamedArgument",
         "st.slash.SlashCommandParser"
+      ],
+      "westworld": [
+        "st.westworld.getDirectorContext",
+        "st.westworld.getDirectorInjectionPrompt",
+        "st.westworld.getDirectorLogs",
+        "st.westworld.getDirectorPromptForLittleWhiteBox",
+        "st.westworld.getDirectorRuntimeStatus",
+        "st.westworld.getDirectorStatus",
+        "st.westworld.inspectDirectorInjection"
+      ],
+      "westworldTxtToWorldbook": [
+        "st.westworldTxtToWorldbook.getDirectorContext",
+        "st.westworldTxtToWorldbook.getDirectorInjectionPrompt",
+        "st.westworldTxtToWorldbook.getDirectorLogs",
+        "st.westworldTxtToWorldbook.getDirectorPromptForLittleWhiteBox",
+        "st.westworldTxtToWorldbook.getDirectorRuntimeStatus",
+        "st.westworldTxtToWorldbook.inspectDirectorInjection"
       ]
     }
   },
@@ -437,7 +454,20 @@
     "st.slash.executeSlashCommands",
     "st.slash.executeSlashCommandsWithOptions",
     "st.slash.getSlashCommandsHelp",
-    "st.slash.registerSlashCommand"
+    "st.slash.registerSlashCommand",
+    "st.westworld.getDirectorContext",
+    "st.westworld.getDirectorInjectionPrompt",
+    "st.westworld.getDirectorLogs",
+    "st.westworld.getDirectorPromptForLittleWhiteBox",
+    "st.westworld.getDirectorRuntimeStatus",
+    "st.westworld.getDirectorStatus",
+    "st.westworld.inspectDirectorInjection",
+    "st.westworldTxtToWorldbook.getDirectorContext",
+    "st.westworldTxtToWorldbook.getDirectorInjectionPrompt",
+    "st.westworldTxtToWorldbook.getDirectorLogs",
+    "st.westworldTxtToWorldbook.getDirectorPromptForLittleWhiteBox",
+    "st.westworldTxtToWorldbook.getDirectorRuntimeStatus",
+    "st.westworldTxtToWorldbook.inspectDirectorInjection"
   ],
   "apiSemantics": {
     "ctx.activateSendButtons": "ui",
@@ -613,7 +643,20 @@
     "st.slash.executeSlashCommands": "exec",
     "st.slash.executeSlashCommandsWithOptions": "exec",
     "st.slash.getSlashCommandsHelp": "read",
-    "st.slash.registerSlashCommand": "exec"
+    "st.slash.registerSlashCommand": "exec",
+    "st.westworld.getDirectorContext": "read",
+    "st.westworld.getDirectorInjectionPrompt": "read",
+    "st.westworld.getDirectorLogs": "read",
+    "st.westworld.getDirectorPromptForLittleWhiteBox": "read",
+    "st.westworld.getDirectorRuntimeStatus": "read",
+    "st.westworld.getDirectorStatus": "read",
+    "st.westworld.inspectDirectorInjection": "read",
+    "st.westworldTxtToWorldbook.getDirectorContext": "read",
+    "st.westworldTxtToWorldbook.getDirectorInjectionPrompt": "read",
+    "st.westworldTxtToWorldbook.getDirectorLogs": "read",
+    "st.westworldTxtToWorldbook.getDirectorPromptForLittleWhiteBox": "read",
+    "st.westworldTxtToWorldbook.getDirectorRuntimeStatus": "read",
+    "st.westworldTxtToWorldbook.inspectDirectorInjection": "read"
   },
   "allowedPaths": [
     "ctx",
@@ -869,6 +912,21 @@
     "st.slash.SlashCommandArgument",
     "st.slash.SlashCommandEnumValue",
     "st.slash.SlashCommandNamedArgument",
-    "st.slash.SlashCommandParser"
+    "st.slash.SlashCommandParser",
+    "st.westworld",
+    "st.westworld.getDirectorContext",
+    "st.westworld.getDirectorInjectionPrompt",
+    "st.westworld.getDirectorLogs",
+    "st.westworld.getDirectorPromptForLittleWhiteBox",
+    "st.westworld.getDirectorRuntimeStatus",
+    "st.westworld.getDirectorStatus",
+    "st.westworld.inspectDirectorInjection",
+    "st.westworldTxtToWorldbook",
+    "st.westworldTxtToWorldbook.getDirectorContext",
+    "st.westworldTxtToWorldbook.getDirectorInjectionPrompt",
+    "st.westworldTxtToWorldbook.getDirectorLogs",
+    "st.westworldTxtToWorldbook.getDirectorPromptForLittleWhiteBox",
+    "st.westworldTxtToWorldbook.getDirectorRuntimeStatus",
+    "st.westworldTxtToWorldbook.inspectDirectorInjection"
   ]
 }

@@ -522,6 +522,8 @@ function buildDocumentedJsApiNamespace(manifest = {}, documentedContext) {
         SlashCommandArgument,
         SlashCommandNamedArgument,
     };
+    const westworldApi = window.WestWorld || window.StoryWeaver || null;
+    const westworldTxtToWorldbookApi = window.WestWorldTxtToWorldbook || window.StoryWeaverTxtToWorldbook || westworldApi || null;
 
     return Object.freeze({
         script: cloneDocumentedNamespace(
@@ -538,6 +540,14 @@ function buildDocumentedJsApiNamespace(manifest = {}, documentedContext) {
         slash: cloneDocumentedNamespace(
             slashRuntimeNamespace,
             createAllowedPathTree(Array.isArray(manifest.allowedPaths) ? manifest.allowedPaths : [], 'st.slash.'),
+        ),
+        westworld: cloneDocumentedNamespace(
+            westworldApi || {},
+            createAllowedPathTree(Array.isArray(manifest.allowedPaths) ? manifest.allowedPaths : [], 'st.westworld.'),
+        ),
+        westworldTxtToWorldbook: cloneDocumentedNamespace(
+            westworldTxtToWorldbookApi || {},
+            createAllowedPathTree(Array.isArray(manifest.allowedPaths) ? manifest.allowedPaths : [], 'st.westworldTxtToWorldbook.'),
         ),
     });
 }
@@ -630,6 +640,18 @@ function buildRuntimeJsApiManifest(manifest = {}, documentedContext, st) {
                 slash: uniqueSorted(
                     (((manifest.namespaces || {}).st && Array.isArray(manifest.namespaces.st.slash))
                         ? manifest.namespaces.st.slash
+                        : [])
+                        .filter((item) => runtimeAllowedSet.has(item)),
+                ),
+                westworld: uniqueSorted(
+                    (((manifest.namespaces || {}).st && Array.isArray(manifest.namespaces.st.westworld))
+                        ? manifest.namespaces.st.westworld
+                        : [])
+                        .filter((item) => runtimeAllowedSet.has(item)),
+                ),
+                westworldTxtToWorldbook: uniqueSorted(
+                    (((manifest.namespaces || {}).st && Array.isArray(manifest.namespaces.st.westworldTxtToWorldbook))
+                        ? manifest.namespaces.st.westworldTxtToWorldbook
                         : [])
                         .filter((item) => runtimeAllowedSet.has(item)),
                 ),

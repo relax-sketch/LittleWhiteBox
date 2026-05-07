@@ -1705,6 +1705,18 @@ if (typeof window !== 'undefined') {
         return oai_settings?.preset_settings_openai || '';
     };
 
+    window.LittleWhiteBox.getWestWorldDirectorInjection = async function (options = {}) {
+        try {
+            const api = window.WestWorld || window.WestWorldTxtToWorldbook || window.StoryWeaver || null;
+            if (!api || typeof api.getDirectorPromptForLittleWhiteBox !== 'function') {
+                return { ok: false, reason: 'westworld-api-missing' };
+            }
+            return await api.getDirectorPromptForLittleWhiteBox(options);
+        } catch (error) {
+            return { ok: false, reason: error?.message || String(error) };
+        }
+    };
+
     // 保持向后兼容：保留原有的内部接口
     window.LittleWhiteBox._internal = {
         service: callGenerateService,
