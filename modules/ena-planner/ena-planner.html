@@ -277,6 +277,26 @@
         </section>
 
         <section class="card">
+          <div class="card-title">WestWorld 导演</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">调用 WestWorld 导演执行单</label>
+              <select id="ep_ww_enabled" class="input">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+              <p class="form-hint">开启后，Ena Planner 会通过 WestWorld 公开 API 读取当前导演执行单，并作为规划上下文加入请求。WestWorld 不可用时会自动跳过。</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">最大读取字符数</label>
+              <input id="ep_ww_max_length" type="number" class="input" min="0" max="20000" step="500">
+              <p class="form-hint">0 表示不截断。建议 2000-6000，避免规划提示词过长。</p>
+            </div>
+          </div>
+          <button id="ep_ww_diagnose" class="btn" type="button">诊断 WestWorld 导演</button>
+        </section>
+
+        <section class="card">
           <div class="card-title">聊天与历史</div>
           <div class="form-group">
             <label class="form-label">保留的规划输出标签（逗号分隔）</label>
@@ -726,6 +746,9 @@
       $('ep_wb_exclude_names').value = arrToCsv(cfg.worldbookExcludeNames);
       cfg.vectorKnowledge = cfg.vectorKnowledge || {};
       $('ep_vk_enabled').value = String(toBool(cfg.vectorKnowledge.enabled, false));
+      cfg.westWorldDirector = cfg.westWorldDirector || {};
+      $('ep_ww_enabled').value = String(toBool(cfg.westWorldDirector.enabled, false));
+      $('ep_ww_max_length').value = String(toNum(cfg.westWorldDirector.maxLength, 4000));
       $('ep_plot_n').value = String(toNum(cfg.plotCount, 2));
       $('ep_keep_tags').value = arrToCsv(cfg.responseKeepTags || ['plot', 'note', 'plot-log', 'state']);
       $('ep_exclude_tags').value = arrToCsv(cfg.chatExcludeTags);
@@ -769,6 +792,10 @@
       p.worldbookExcludeNames = csvToArr($('ep_wb_exclude_names').value);
       p.vectorKnowledge = {
         enabled: toBool($('ep_vk_enabled').value, false),
+      };
+      p.westWorldDirector = {
+        enabled: toBool($('ep_ww_enabled').value, false),
+        maxLength: Math.max(0, Math.min(20000, Math.floor(toNum($('ep_ww_max_length').value, 4000)))),
       };
       p.plotCount = Math.max(0, Math.floor(toNum($('ep_plot_n').value, 2)));
       p.responseKeepTags = normalizeKeepTagsInput($('ep_keep_tags').value);
@@ -817,6 +844,11 @@
         out.classList.add('visible');
         out.textContent = '诊断中…';
         post('xb-ena:debug-vector-knowledge');
+      });
+      $('ep_ww_diagnose').addEventListener('click', () => {
+        activateTab('debug');
+        $('ep_debug_output').textContent = '查询 WestWorld 中…';
+        post('xb-ena:debug-westworld');
       });
 
       $('ep_fetch_models').addEventListener('click', () => {

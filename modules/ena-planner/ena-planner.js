@@ -49,6 +49,12 @@ function getDefaultSettings() {
             enabled: false,
         },
 
+        // Optional WestWorld director context for planner messages
+        westWorldDirector: {
+            enabled: false,
+            maxLength: 4000,
+        },
+
         // Planner prompts (designer)
         promptBlocks: structuredClone(DEFAULT_PROMPT_BLOCKS),
         // Saved prompt templates: { name: promptBlocks[] }
@@ -131,6 +137,14 @@ function ensureSettings() {
         delete vk.queryInstructionEnabled;
         delete vk.queryInstruction;
         delete vk.template;
+    }
+    if (!s.westWorldDirector || typeof s.westWorldDirector !== 'object') {
+        s.westWorldDirector = structuredClone(d.westWorldDirector);
+    } else {
+        const ww = s.westWorldDirector;
+        ww.enabled = !!ww.enabled;
+        const maxLength = Math.max(0, Math.min(20000, parseInt(ww.maxLength, 10) || d.westWorldDirector.maxLength));
+        ww.maxLength = maxLength;
     }
 
     // Migration: remove old keys that are no longer needed
@@ -455,6 +469,63 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
         stats: result?.stats || null,
         error: '',
     };
+}
+
+function getWestWorldApiSafe() {
+    try {
+        return window.WestWorld || window.WestWorldTxtToWorldbook || window.StoryWeaver || window.StoryWeaverTxtToWorldbook || null;
+    } catch (_) {
+        return null;
+    }
+}
+
+async function buildWestWorldDirectorBlock() {
+    const s = ensureSettings();
+    const ww = s.westWorldDirector || {};
+    if (!ww.enabled) return { text: '', meta: null, error: '' };
+
+    const api = getWestWorldApiSafe();
+    if (!api || typeof api.getDirectorPromptForLittleWhiteBox !== 'function') {
+        return { text: '', meta: null, error: 'westworld-api-missing' };
+    }
+
+    try {
+        const result = await api.getDirectorPromptForLittleWhiteBox({
+            includeMarker: true,
+            includeDiagnostics: false,
+            maxLength: Math.max(0, Math.min(20000, parseInt(ww.maxLength, 10) || 4000)),
+            mode: 'current',
+        });
+        if (!result?.ok || !result?.injection?.content) {
+            return {
+                text: '',
+                meta: result?.meta || null,
+                error: result?.reason || 'westworld-director-empty',
+            };
+        }
+
+        const context = result.context || {};
+        const chapter = context.chapter || {};
+        const beat = context.beat || {};
+        const header = [
+            '<westworld_director>',
+            `chapter: ${Number.isInteger(chapter.index) ? chapter.index + 1 : 'unknown'}`,
+            `beat: ${Number.isInteger(beat.index) ? `${beat.index + 1}/${beat.count || 0}` : 'unknown'}`,
+            'content:',
+        ].join('\n');
+
+        return {
+            text: `${header}\n${result.injection.content}\n</westworld_director>`,
+            meta: result.meta || null,
+            error: '',
+        };
+    } catch (error) {
+        return {
+            text: '',
+            meta: null,
+            error: error?.message || String(error),
+        };
+    }
 }
 
 function getVectorsEnhancedTaskOptionsForUi() {
@@ -1214,6 +1285,38 @@ async function debugVectorKnowledgeForUi() {
     });
 }
 
+async function debugWestWorldForUi() {
+    const s = ensureSettings();
+    const api = getWestWorldApiSafe();
+    if (!api) return 'WestWorld API 不可用';
+
+    const status = typeof api.getDirectorRuntimeStatus === 'function'
+        ? api.getDirectorRuntimeStatus()
+        : (typeof api.getDirectorStatus === 'function' ? api.getDirectorStatus() : null);
+    const context = typeof api.getDirectorContext === 'function'
+        ? api.getDirectorContext({ includeRuntime: true })
+        : null;
+    const prompt = typeof api.getDirectorPromptForLittleWhiteBox === 'function'
+        ? await api.getDirectorPromptForLittleWhiteBox({
+            includeMarker: true,
+            maxLength: Math.max(0, Math.min(20000, parseInt(s.westWorldDirector?.maxLength, 10) || 4000)),
+            mode: 'current',
+        })
+        : { ok: false, reason: 'getDirectorPromptForLittleWhiteBox-missing' };
+
+    return JSON.stringify({
+        enabledInEna: !!s.westWorldDirector?.enabled,
+        status,
+        context,
+        prompt: prompt?.ok ? {
+            ok: true,
+            meta: prompt.meta || null,
+            contentLength: String(prompt.injection?.content || '').length,
+            identifier: prompt.injection?.identifier || '',
+        } : prompt,
+    }, null, 2);
+}
+
 /**
  * -------------------------
  * Build planner messages
@@ -1305,9 +1408,22 @@ async function buildPlannerMessages(rawUserInput) {
         vectorKnowledgeError = String(e?.message ?? e);
         console.warn('[Ena] Vectors Enhanced knowledge recall failed:', e);
     }
+    let westWorldDirectorRaw = '';
+    let westWorldDirectorMeta = null;
+    let westWorldDirectorError = '';
+    try {
+        const result = await buildWestWorldDirectorBlock();
+        westWorldDirectorRaw = result?.text || '';
+        westWorldDirectorMeta = result?.meta || null;
+        westWorldDirectorError = result?.error || '';
+        if (westWorldDirectorError) console.warn('[Ena] WestWorld director context skipped:', westWorldDirectorError);
+    } catch (e) {
+        westWorldDirectorError = String(e?.message ?? e);
+        console.warn('[Ena] WestWorld director context failed:', e);
+    }
 
     // Build scanText for worldbook keyword activation
-    const scanText = [charBlockRaw, recentChatRaw, vectorRaw, plotsRaw, rawUserInput].join('\n\n');
+    const scanText = [charBlockRaw, recentChatRaw, vectorRaw, westWorldDirectorRaw, plotsRaw, rawUserInput].join('\n\n');
 
     const worldbookRaw = await buildWorldbookBlock(scanText);
     const outlineRaw = typeof formatOutlinePrompt === 'function' ? (formatOutlinePrompt() || '') : '';
@@ -1317,6 +1433,7 @@ async function buildPlannerMessages(rawUserInput) {
     const recentChat = await renderTemplateAll(recentChatRaw, env, messageVars);
     const plots = await renderTemplateAll(plotsRaw, env, messageVars);
     const vector = await renderTemplateAll(vectorRaw, env, messageVars);
+    const westWorldDirector = await renderTemplateAll(westWorldDirectorRaw, env, messageVars);
     const storySummary = cachedSummary.trim().length > 30 ? await renderTemplateAll(cachedSummary, env, messageVars) : '';
     const worldbook = await renderTemplateAll(worldbookRaw, env, messageVars);
     const userInput = await renderTemplateAll(rawUserInput, env, messageVars);
@@ -1352,6 +1469,9 @@ async function buildPlannerMessages(rawUserInput) {
     // 5) Vectors Enhanced knowledge recall for the planner
     if (String(vector).trim()) messages.push({ role: 'system', content: vector });
 
+    // 5.5) WestWorld director execution sheet
+    if (String(westWorldDirector).trim()) messages.push({ role: 'system', content: westWorldDirector });
+
     // 6) Previous plots
     if (String(plots).trim()) messages.push({ role: 'system', content: plots });
 
@@ -1382,6 +1502,9 @@ async function buildPlannerMessages(rawUserInput) {
             vectorRaw,
             vectorKnowledgeStats,
             vectorKnowledgeError,
+            westWorldDirectorRaw,
+            westWorldDirectorMeta,
+            westWorldDirectorError,
             cachedSummaryLen: cachedSummary.length,
             plotsRaw,
         },
@@ -1681,6 +1804,15 @@ async function handleIframeMessage(ev) {
         case 'xb-ena:debug-vector-knowledge': {
             try {
                 const output = await debugVectorKnowledgeForUi();
+                postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output } });
+            } catch (err) {
+                postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output: String(err?.stack || err?.message || err) } });
+            }
+            break;
+        }
+        case 'xb-ena:debug-westworld': {
+            try {
+                const output = await debugWestWorldForUi();
                 postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output } });
             } catch (err) {
                 postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output: String(err?.stack || err?.message || err) } });
