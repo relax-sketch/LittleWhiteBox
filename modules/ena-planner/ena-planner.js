@@ -479,14 +479,43 @@ function getWestWorldApiSafe() {
     }
 }
 
+function normalizePostDepthNumber(value, fallback, min, max) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+function insertPostDepthInjections(messages, injections = []) {
+    if (!Array.isArray(messages) || !Array.isArray(injections) || !injections.length) return messages;
+    const out = messages.slice();
+    const normalized = injections
+        .filter((item) => item && item.role && typeof item.content === 'string' && item.content.trim())
+        .map((item) => ({
+            ...item,
+            depth: normalizePostDepthNumber(item.depth, 0, 0, 100),
+            order: normalizePostDepthNumber(item.order, 100, -10000, 10000),
+        }))
+        .sort((a, b) => a.order - b.order);
+
+    for (const item of normalized) {
+        const insertPos = Math.max(0, Math.min(out.length, out.length - item.depth));
+        out.splice(insertPos, 0, {
+            role: item.role,
+            content: item.content,
+            identifier: item.identifier || 'westworld-director-current',
+        });
+    }
+    return out;
+}
+
 async function buildWestWorldDirectorBlock() {
     const s = ensureSettings();
     const ww = s.westWorldDirector || {};
-    if (!ww.enabled) return { text: '', meta: null, error: '' };
+    if (!ww.enabled) return { text: '', injection: null, meta: null, error: '' };
 
     const api = getWestWorldApiSafe();
     if (!api || typeof api.getDirectorPromptForLittleWhiteBox !== 'function') {
-        return { text: '', meta: null, error: 'westworld-api-missing' };
+        return { text: '', injection: null, meta: null, error: 'westworld-api-missing' };
     }
 
     try {
@@ -499,6 +528,7 @@ async function buildWestWorldDirectorBlock() {
         if (!result?.ok || !result?.injection?.content) {
             return {
                 text: '',
+                injection: null,
                 meta: result?.meta || null,
                 error: result?.reason || 'westworld-director-empty',
             };
@@ -514,14 +544,25 @@ async function buildWestWorldDirectorBlock() {
             'content:',
         ].join('\n');
 
+        const injection = result.injection || {};
+        const content = `${header}\n${injection.content}\n</westworld_director>`;
         return {
-            text: `${header}\n${result.injection.content}\n</westworld_director>`,
+            text: content,
+            injection: {
+                role: injection.role || 'system',
+                content,
+                identifier: injection.identifier || 'westworld-director-current',
+                position: injection.position || 'IN_CHAT',
+                depth: normalizePostDepthNumber(injection.depth, 0, 0, 100),
+                order: normalizePostDepthNumber(injection.order, 100, -10000, 10000),
+            },
             meta: result.meta || null,
             error: '',
         };
     } catch (error) {
         return {
             text: '',
+            injection: null,
             meta: null,
             error: error?.message || String(error),
         };
@@ -1313,6 +1354,9 @@ async function debugWestWorldForUi() {
             meta: prompt.meta || null,
             contentLength: String(prompt.injection?.content || '').length,
             identifier: prompt.injection?.identifier || '',
+            position: prompt.injection?.position || '',
+            depth: prompt.injection?.depth ?? 0,
+            order: prompt.injection?.order ?? 100,
         } : prompt,
     }, null, 2);
 }
@@ -1409,11 +1453,13 @@ async function buildPlannerMessages(rawUserInput) {
         console.warn('[Ena] Vectors Enhanced knowledge recall failed:', e);
     }
     let westWorldDirectorRaw = '';
+    let westWorldDirectorInjection = null;
     let westWorldDirectorMeta = null;
     let westWorldDirectorError = '';
     try {
         const result = await buildWestWorldDirectorBlock();
         westWorldDirectorRaw = result?.text || '';
+        westWorldDirectorInjection = result?.injection || null;
         westWorldDirectorMeta = result?.meta || null;
         westWorldDirectorError = result?.error || '';
         if (westWorldDirectorError) console.warn('[Ena] WestWorld director context skipped:', westWorldDirectorError);
@@ -1469,9 +1515,6 @@ async function buildPlannerMessages(rawUserInput) {
     // 5) Vectors Enhanced knowledge recall for the planner
     if (String(vector).trim()) messages.push({ role: 'system', content: vector });
 
-    // 5.5) WestWorld director execution sheet
-    if (String(westWorldDirector).trim()) messages.push({ role: 'system', content: westWorldDirector });
-
     // 6) Previous plots
     if (String(plots).trim()) messages.push({ role: 'system', content: plots });
 
@@ -1491,7 +1534,17 @@ async function buildPlannerMessages(rawUserInput) {
         messages.push({ role: 'assistant', content });
     }
 
-    const finalMessages = s.mergeConsecutiveSystemMessages ? mergeConsecutiveSystemMessages(messages) : messages;
+    let finalMessages = s.mergeConsecutiveSystemMessages ? mergeConsecutiveSystemMessages(messages) : messages;
+    if (String(westWorldDirector).trim()) {
+        finalMessages = insertPostDepthInjections(finalMessages, [{
+            ...(westWorldDirectorInjection || {}),
+            role: westWorldDirectorInjection?.role || 'system',
+            content: westWorldDirector,
+            identifier: westWorldDirectorInjection?.identifier || 'westworld-director-current',
+            depth: westWorldDirectorInjection?.depth,
+            order: westWorldDirectorInjection?.order,
+        }]);
+    }
 
     return {
         messages: finalMessages,
