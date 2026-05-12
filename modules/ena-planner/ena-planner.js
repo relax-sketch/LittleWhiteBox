@@ -528,6 +528,56 @@ async function buildWestWorldDirectorBlock() {
     }
 }
 
+async function prepareWestWorldDirectorForOriginalInput(rawUserInput) {
+    const s = ensureSettings();
+    const ww = s.westWorldDirector || {};
+    if (!ww.enabled) return { ok: false, skipped: true, reason: 'westworld-disabled' };
+
+    const api = getWestWorldApiSafe();
+    if (!api || typeof api.prepareDirectorPromptForInput !== 'function') {
+        return { ok: false, skipped: true, reason: 'prepareDirectorPromptForInput-missing' };
+    }
+
+    const text = String(rawUserInput || '').trim();
+    if (!text) return { ok: false, skipped: true, reason: 'user-input-empty' };
+
+    try {
+        toastInfo('WestWorld 导演：正在基于原输入判定…');
+        const result = await api.prepareDirectorPromptForInput({
+            userInput: text,
+            source: 'littlewhitebox-ena',
+            type: 'littlewhitebox-ena',
+        });
+        if (result?.ok) {
+            toastInfo('WestWorld 导演：真预设已准备');
+            return result;
+        }
+        console.warn('[Ena] WestWorld director prepare skipped:', result?.reason || 'unknown');
+        return {
+            ok: false,
+            reason: result?.reason || 'westworld-prepare-failed',
+            result,
+        };
+    } catch (error) {
+        console.warn('[Ena] WestWorld director prepare failed:', error);
+        return {
+            ok: false,
+            reason: error?.message || String(error),
+        };
+    }
+}
+
+function clearPreparedWestWorldDirector(reason = 'ena-planner-aborted') {
+    const s = ensureSettings();
+    if (!s.westWorldDirector?.enabled) return;
+    const api = getWestWorldApiSafe();
+    try {
+        api?.clearDirectorPromptManagerContent?.(reason);
+    } catch (error) {
+        console.warn('[Ena] WestWorld director clear failed:', error);
+    }
+}
+
 function getVectorsEnhancedTaskOptionsForUi() {
     const api = window.VectorsEnhanced?.getPlannerTaskOptions;
     if (typeof api === 'function') {
@@ -1577,6 +1627,10 @@ async function doInterceptAndPlanThenSend() {
     setSendUIBusy(true);
 
     try {
+        const westWorldPrepared = await prepareWestWorldDirectorForOriginalInput(raw);
+        if (westWorldPrepared?.reason && !westWorldPrepared?.skipped) {
+            toastInfo(`WestWorld 导演：跳过（${westWorldPrepared.reason}）`);
+        }
         toastInfo('Ena Planner：正在规划…');
         const { filtered } = await runPlanningOnce(raw, false, {
             onDelta(_piece, full) {
@@ -1595,6 +1649,7 @@ async function doInterceptAndPlanThenSend() {
     } catch (err) {
         ta.value = raw;
         state.lastInjectedText = '';
+        clearPreparedWestWorldDirector('ena-planner-failed');
         throw err;
     } finally {
         state.isPlanning = false;
