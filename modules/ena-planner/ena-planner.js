@@ -17,6 +17,36 @@ const OVERLAY_ID = 'xiaobaix-ena-planner-overlay';
 const HTML_PATH = `${extensionFolderPath}/modules/ena-planner/ena-planner.html`;
 const VECTOR_RECALL_TIMEOUT_MS = 15000;
 const PLANNER_REQUEST_TIMEOUT_MS = 180000;
+const BUILTIN_MODULE_KEYS = [
+    'charCard',
+    'worldbook',
+    'storyOutline',
+    'recentChat',
+    'storySummary',
+    'vectorsEnhanced',
+    'westWorldDirector',
+    'previousPlots',
+    'userInput',
+];
+const BUILTIN_MODULE_DEFAULTS = Object.freeze({
+    charCard: true,
+    worldbook: true,
+    storyOutline: true,
+    recentChat: true,
+    storySummary: true,
+    vectorsEnhanced: false,
+    westWorldDirector: false,
+    previousPlots: true,
+    userInput: true,
+});
+const WORLDBOOK_SCAN_MODULE_KEYS = new Set([
+    'charCard',
+    'recentChat',
+    'vectorsEnhanced',
+    'westWorldDirector',
+    'previousPlots',
+    'userInput',
+]);
 
 /**
  * -------------------------
@@ -24,6 +54,7 @@ const PLANNER_REQUEST_TIMEOUT_MS = 180000;
  * --------------------------
  */
 function getDefaultSettings() {
+    const promptBlocks = structuredClone(DEFAULT_PROMPT_BLOCKS);
     return {
         enabled: true,
         skipIfPlotPresent: true,
@@ -56,9 +87,10 @@ function getDefaultSettings() {
         },
 
         // Planner prompts (designer)
-        promptBlocks: structuredClone(DEFAULT_PROMPT_BLOCKS),
-        // Saved prompt templates: { name: promptBlocks[] }
-        promptTemplates: structuredClone(BUILTIN_TEMPLATES),
+        promptBlocks,
+        moduleChain: buildLegacyCompatibleModuleChain(promptBlocks),
+        // Saved prompt templates: { name: { promptBlocks, moduleChain } }
+        promptTemplates: buildDefaultPromptTemplates(),
         // Currently selected prompt template name in UI
         activePromptTemplate: '',
 
@@ -83,6 +115,114 @@ function getDefaultSettings() {
         logsPersist: true,
         logsMax: 20
     };
+}
+
+function buildDefaultPromptTemplates() {
+    return Object.fromEntries(Object.entries(BUILTIN_TEMPLATES || {}).map(([name, promptBlocks]) => {
+        const blocks = structuredClone(Array.isArray(promptBlocks) ? promptBlocks : []);
+        return [name, {
+            promptBlocks: blocks,
+            moduleChain: buildLegacyCompatibleModuleChain(blocks),
+        }];
+    }));
+}
+
+function getLegacyBuiltinEnabled(settingsLike, key) {
+    if (key === 'vectorsEnhanced') return !!settingsLike?.vectorKnowledge?.enabled;
+    if (key === 'westWorldDirector') return !!settingsLike?.westWorldDirector?.enabled;
+    return BUILTIN_MODULE_DEFAULTS[key] !== false;
+}
+
+function buildLegacyCompatibleModuleChain(promptBlocks = [], settingsLike = {}) {
+    const blocks = Array.isArray(promptBlocks) ? promptBlocks : [];
+    const byRole = (role) => blocks
+        .filter(block => block?.role === role)
+        .map(block => ({ kind: 'promptBlock', blockId: block.id, enabled: true }));
+
+    return [
+        ...byRole('system'),
+        { kind: 'builtin', key: 'charCard', enabled: getLegacyBuiltinEnabled(settingsLike, 'charCard') },
+        { kind: 'builtin', key: 'worldbook', enabled: getLegacyBuiltinEnabled(settingsLike, 'worldbook') },
+        { kind: 'builtin', key: 'storyOutline', enabled: getLegacyBuiltinEnabled(settingsLike, 'storyOutline') },
+        { kind: 'builtin', key: 'recentChat', enabled: getLegacyBuiltinEnabled(settingsLike, 'recentChat') },
+        { kind: 'builtin', key: 'storySummary', enabled: getLegacyBuiltinEnabled(settingsLike, 'storySummary') },
+        { kind: 'builtin', key: 'vectorsEnhanced', enabled: getLegacyBuiltinEnabled(settingsLike, 'vectorsEnhanced') },
+        { kind: 'builtin', key: 'westWorldDirector', enabled: getLegacyBuiltinEnabled(settingsLike, 'westWorldDirector') },
+        { kind: 'builtin', key: 'previousPlots', enabled: getLegacyBuiltinEnabled(settingsLike, 'previousPlots') },
+        ...byRole('user'),
+        { kind: 'builtin', key: 'userInput', enabled: getLegacyBuiltinEnabled(settingsLike, 'userInput') },
+        ...byRole('assistant'),
+    ];
+}
+
+function normalizeLegacyPromptBlocks(promptBlocks = []) {
+    return (Array.isArray(promptBlocks) ? promptBlocks : []).map(block => {
+        if (block?.role !== 'user') return block;
+        // 旧版的 user 提示词块并不是按 user 消息发送，而是作为
+        // 玩家输入前的 system 附加块注入。迁移时把真实行为保留下来。
+        const raw = String(block?.content ?? '');
+        if (!raw.trim()) return { ...block, role: 'system', content: raw };
+        const content = raw.startsWith('【extra-user-block】\n')
+            ? raw
+            : `【extra-user-block】\n${raw}`;
+        return { ...block, role: 'system', content };
+    });
+}
+
+function normalizeModuleChain(chain, promptBlocks = [], settingsLike = {}) {
+    const blocks = Array.isArray(promptBlocks) ? promptBlocks : [];
+    const blockIds = new Set(blocks.map(block => block?.id).filter(Boolean));
+    const normalized = [];
+    const seenBuiltin = new Set();
+    const seenBlocks = new Set();
+
+    for (const raw of Array.isArray(chain) ? chain : []) {
+        if (raw?.kind === 'builtin' && BUILTIN_MODULE_KEYS.includes(raw.key) && !seenBuiltin.has(raw.key)) {
+            normalized.push({ kind: 'builtin', key: raw.key, enabled: raw.enabled !== false });
+            seenBuiltin.add(raw.key);
+            continue;
+        }
+        if (raw?.kind === 'promptBlock' && blockIds.has(raw.blockId) && !seenBlocks.has(raw.blockId)) {
+            normalized.push({ kind: 'promptBlock', blockId: raw.blockId, enabled: raw.enabled !== false });
+            seenBlocks.add(raw.blockId);
+        }
+    }
+
+    for (const key of BUILTIN_MODULE_KEYS) {
+        if (!seenBuiltin.has(key)) {
+            normalized.push({ kind: 'builtin', key, enabled: getLegacyBuiltinEnabled(settingsLike, key) });
+        }
+    }
+    for (const block of blocks) {
+        if (block?.id && !seenBlocks.has(block.id)) {
+            normalized.push({ kind: 'promptBlock', blockId: block.id, enabled: true });
+        }
+    }
+    return normalized;
+}
+
+function normalizePromptTemplate(rawTemplate, settingsLike = {}) {
+    if (Array.isArray(rawTemplate)) {
+        const legacyPromptBlocks = structuredClone(rawTemplate);
+        const promptBlocks = normalizeLegacyPromptBlocks(legacyPromptBlocks);
+        return {
+            promptBlocks,
+            moduleChain: buildLegacyCompatibleModuleChain(legacyPromptBlocks, settingsLike),
+        };
+    }
+    const promptBlocks = structuredClone(Array.isArray(rawTemplate?.promptBlocks) ? rawTemplate.promptBlocks : []);
+    return {
+        promptBlocks,
+        moduleChain: normalizeModuleChain(rawTemplate?.moduleChain, promptBlocks, settingsLike),
+    };
+}
+
+function normalizePromptTemplates(templates, settingsLike = {}) {
+    const out = {};
+    for (const [name, template] of Object.entries(templates || {})) {
+        out[name] = normalizePromptTemplate(template, settingsLike);
+    }
+    return out;
 }
 
 /**
@@ -113,6 +253,7 @@ let sendKeydownHandler = null;
 function ensureSettings() {
     const d = getDefaultSettings();
     const s = config || structuredClone(d);
+    const hadModuleChain = Array.isArray(s.moduleChain);
 
     function deepMerge(target, src) {
         for (const k of Object.keys(src)) {
@@ -146,6 +287,15 @@ function ensureSettings() {
         const maxLength = Math.max(0, Math.min(20000, parseInt(ww.maxLength, 10) || d.westWorldDirector.maxLength));
         ww.maxLength = maxLength;
     }
+    if (!Array.isArray(s.promptBlocks)) s.promptBlocks = structuredClone(d.promptBlocks);
+    if (!hadModuleChain) {
+        const legacyPromptBlocks = structuredClone(s.promptBlocks);
+        s.promptBlocks = normalizeLegacyPromptBlocks(s.promptBlocks);
+        s.moduleChain = buildLegacyCompatibleModuleChain(legacyPromptBlocks, s);
+    } else {
+        s.moduleChain = normalizeModuleChain(s.moduleChain, s.promptBlocks, s);
+    }
+    s.promptTemplates = normalizePromptTemplates(s.promptTemplates || d.promptTemplates, s);
 
     // Migration: remove old keys that are no longer needed
     delete s.includeCharacterLorebooks;
@@ -158,6 +308,23 @@ function ensureSettings() {
 
     config = s;
     return s;
+}
+
+function getModuleChainEntry(key) {
+    const s = ensureSettings();
+    return (s.moduleChain || []).find(item => item?.kind === 'builtin' && item.key === key) || null;
+}
+
+function isBuiltinModuleEnabled(key) {
+    return getModuleChainEntry(key)?.enabled !== false;
+}
+
+function getEnabledPromptBlockIds() {
+    const s = ensureSettings();
+    return new Set((s.moduleChain || [])
+        .filter(item => item?.kind === 'promptBlock' && item.enabled !== false)
+        .map(item => item.blockId)
+        .filter(Boolean));
 }
 
 function normalizeResponseKeepTags(tags) {
@@ -438,10 +605,6 @@ function buildPlannerVectorQuery(rawUserInput, parts = {}) {
 }
 
 async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
-    const s = ensureSettings();
-    const vk = s.vectorKnowledge || {};
-    if (!vk.enabled) return { text: '', stats: null, error: '' };
-
     const api = await waitForVectorsEnhancedApi('queryForPrompt');
     if (typeof api !== 'function') {
         return { text: '', stats: null, error: 'Vectors Enhanced 查询接口不可用' };
@@ -482,7 +645,6 @@ function getWestWorldApiSafe() {
 async function buildWestWorldDirectorBlock() {
     const s = ensureSettings();
     const ww = s.westWorldDirector || {};
-    if (!ww.enabled) return { text: '', meta: null, error: '' };
 
     const api = getWestWorldApiSafe();
     if (!api || typeof api.getDirectorPromptForLittleWhiteBox !== 'function') {
@@ -529,9 +691,7 @@ async function buildWestWorldDirectorBlock() {
 }
 
 async function prepareWestWorldDirectorForOriginalInput(rawUserInput) {
-    const s = ensureSettings();
-    const ww = s.westWorldDirector || {};
-    if (!ww.enabled) return { ok: false, skipped: true, reason: 'westworld-disabled' };
+    if (!isBuiltinModuleEnabled('westWorldDirector')) return { ok: false, skipped: true, reason: 'westworld-disabled' };
 
     const api = getWestWorldApiSafe();
     if (!api || typeof api.prepareDirectorPromptForInput !== 'function') {
@@ -568,8 +728,7 @@ async function prepareWestWorldDirectorForOriginalInput(rawUserInput) {
 }
 
 function clearPreparedWestWorldDirector(reason = 'ena-planner-aborted') {
-    const s = ensureSettings();
-    if (!s.westWorldDirector?.enabled) return;
+    if (!isBuiltinModuleEnabled('westWorldDirector')) return;
     const api = getWestWorldApiSafe();
     try {
         api?.clearDirectorPromptManagerContent?.(reason);
@@ -1355,7 +1514,7 @@ async function debugWestWorldForUi() {
         : { ok: false, reason: 'getDirectorPromptForLittleWhiteBox-missing' };
 
     return JSON.stringify({
-        enabledInEna: !!s.westWorldDirector?.enabled,
+        enabledInEna: isBuiltinModuleEnabled('westWorldDirector'),
         status,
         context,
         prompt: prompt?.ok ? {
@@ -1372,11 +1531,6 @@ async function debugWestWorldForUi() {
  * Build planner messages
  * --------------------------
  */
-function getPromptBlocksByRole(role) {
-    const s = ensureSettings();
-    return (s.promptBlocks || []).filter(b => b?.role === role && String(b?.content ?? '').trim());
-}
-
 function mergeConsecutiveSystemMessages(messages) {
     const merged = [];
     for (const message of messages) {
@@ -1402,81 +1556,97 @@ async function buildPlannerMessages(rawUserInput) {
     const env = await prepareEjsEnv();
     const messageVars = getLatestMessageVarTable();
 
-    const enaSystemBlocks = getPromptBlocksByRole('system');
-    const enaAssistantBlocks = getPromptBlocksByRole('assistant');
-    const enaUserBlocks = getPromptBlocksByRole('user');
+    const enabledBuiltins = new Set((s.moduleChain || [])
+        .filter(item => item?.kind === 'builtin' && item.enabled !== false)
+        .map(item => item.key));
+    const enabledPromptBlocks = getEnabledPromptBlockIds();
 
-    const charBlockRaw = formatCharCardBlock(charObj);
+    const charBlockRaw = enabledBuiltins.has('charCard') ? formatCharCardBlock(charObj) : '';
 
-    // --- Story memory: try fresh vector recall with current user input ---
     let cachedSummary = '';
     let recallSource = 'none';
-    try {
-        const vectorCfg = getVectorConfig();
-        if (vectorCfg?.enabled) {
-            const result = await runWithTimeout(
-                () => buildVectorPromptText(false, {
-                    pendingUserMessage: rawUserInput,
-                }),
-                VECTOR_RECALL_TIMEOUT_MS,
-                `向量召回超时（>${Math.floor(VECTOR_RECALL_TIMEOUT_MS / 1000)}s）`
-            );
-            cachedSummary = result?.text?.trim() || '';
-            if (cachedSummary) recallSource = 'fresh';
+    if (enabledBuiltins.has('storySummary')) {
+        try {
+            const vectorCfg = getVectorConfig();
+            if (vectorCfg?.enabled) {
+                const result = await runWithTimeout(
+                    () => buildVectorPromptText(false, {
+                        pendingUserMessage: rawUserInput,
+                    }),
+                    VECTOR_RECALL_TIMEOUT_MS,
+                    `向量召回超时（>${Math.floor(VECTOR_RECALL_TIMEOUT_MS / 1000)}s）`
+                );
+                cachedSummary = result?.text?.trim() || '';
+                if (cachedSummary) recallSource = 'fresh';
+            }
+        } catch (e) {
+            console.warn('[Ena] Fresh vector recall failed, falling back to cached data:', e);
         }
-    } catch (e) {
-        console.warn('[Ena] Fresh vector recall failed, falling back to cached data:', e);
+        if (!cachedSummary) {
+            cachedSummary = getCachedStorySummary();
+            if (cachedSummary) recallSource = 'stale';
+        }
+        console.log(`[Ena] Story memory source: ${recallSource}`);
     }
-    if (!cachedSummary) {
-        cachedSummary = getCachedStorySummary();
-        if (cachedSummary) recallSource = 'stale';
-    }
-    console.log(`[Ena] Story memory source: ${recallSource}`);
 
-    // --- Chat history: last 2 AI messages (floors N-1 & N-3) ---
-    // Two messages instead of one to avoid cross-device cache miss:
-    // story_summary cache is captured during main AI generation, so if
-    // user switches device and triggers Ena before a new generation,
-    // having N-3 as backup context prevents a gap.
-    const recentChatRaw = collectRecentChatSnippet(chat, 2);
-
-    const plotsRaw = formatPlotsBlock(extractLastNPlots(chat, s.plotCount));
+    // Chat history: last 2 AI messages (floors N-1 & N-3)
+    const recentChatRaw = enabledBuiltins.has('recentChat') ? collectRecentChatSnippet(chat, 2) : '';
+    const plotsRaw = enabledBuiltins.has('previousPlots')
+        ? formatPlotsBlock(extractLastNPlots(chat, s.plotCount))
+        : '';
     let vectorRaw = '';
     let vectorKnowledgeStats = null;
     let vectorKnowledgeError = '';
-    try {
-        const result = await runWithTimeout(
-            () => buildVectorsEnhancedKnowledge(rawUserInput, { recentChatRaw, plotsRaw }),
-            VECTOR_RECALL_TIMEOUT_MS,
-            `剧情规划向量知识库召回超时（>${Math.floor(VECTOR_RECALL_TIMEOUT_MS / 1000)}s）`
-        );
-        vectorRaw = result?.text || '';
-        vectorKnowledgeStats = result?.stats || null;
-        vectorKnowledgeError = result?.error || '';
-        if (vectorKnowledgeError) console.warn('[Ena] Vectors Enhanced knowledge skipped:', vectorKnowledgeError);
-    } catch (e) {
-        vectorKnowledgeError = String(e?.message ?? e);
-        console.warn('[Ena] Vectors Enhanced knowledge recall failed:', e);
+    if (enabledBuiltins.has('vectorsEnhanced')) {
+        try {
+            const result = await runWithTimeout(
+                () => buildVectorsEnhancedKnowledge(rawUserInput, { recentChatRaw, plotsRaw }),
+                VECTOR_RECALL_TIMEOUT_MS,
+                `剧情规划向量知识库召回超时（>${Math.floor(VECTOR_RECALL_TIMEOUT_MS / 1000)}s）`
+            );
+            vectorRaw = result?.text || '';
+            vectorKnowledgeStats = result?.stats || null;
+            vectorKnowledgeError = result?.error || '';
+            if (vectorKnowledgeError) console.warn('[Ena] Vectors Enhanced knowledge skipped:', vectorKnowledgeError);
+        } catch (e) {
+            vectorKnowledgeError = String(e?.message ?? e);
+            console.warn('[Ena] Vectors Enhanced knowledge recall failed:', e);
+        }
     }
     let westWorldDirectorRaw = '';
     let westWorldDirectorMeta = null;
     let westWorldDirectorError = '';
-    try {
-        const result = await buildWestWorldDirectorBlock();
-        westWorldDirectorRaw = result?.text || '';
-        westWorldDirectorMeta = result?.meta || null;
-        westWorldDirectorError = result?.error || '';
-        if (westWorldDirectorError) console.warn('[Ena] WestWorld director context skipped:', westWorldDirectorError);
-    } catch (e) {
-        westWorldDirectorError = String(e?.message ?? e);
-        console.warn('[Ena] WestWorld director context failed:', e);
+    if (enabledBuiltins.has('westWorldDirector')) {
+        try {
+            const result = await buildWestWorldDirectorBlock();
+            westWorldDirectorRaw = result?.text || '';
+            westWorldDirectorMeta = result?.meta || null;
+            westWorldDirectorError = result?.error || '';
+            if (westWorldDirectorError) console.warn('[Ena] WestWorld director context skipped:', westWorldDirectorError);
+        } catch (e) {
+            westWorldDirectorError = String(e?.message ?? e);
+            console.warn('[Ena] WestWorld director context failed:', e);
+        }
     }
 
-    // Build scanText for worldbook keyword activation
-    const scanText = [charBlockRaw, recentChatRaw, vectorRaw, westWorldDirectorRaw, plotsRaw, rawUserInput].join('\n\n');
+    const scanSourceMap = {
+        charCard: charBlockRaw,
+        recentChat: recentChatRaw,
+        vectorsEnhanced: vectorRaw,
+        westWorldDirector: westWorldDirectorRaw,
+        previousPlots: plotsRaw,
+        userInput: rawUserInput,
+    };
+    const scanText = [...WORLDBOOK_SCAN_MODULE_KEYS]
+        .filter(key => enabledBuiltins.has(key))
+        .map(key => scanSourceMap[key] || '')
+        .filter(Boolean)
+        .join('\n\n');
 
-    const worldbookRaw = await buildWorldbookBlock(scanText);
-    const outlineRaw = typeof formatOutlinePrompt === 'function' ? (formatOutlinePrompt() || '') : '';
+    const worldbookRaw = enabledBuiltins.has('worldbook') ? await buildWorldbookBlock(scanText) : '';
+    const outlineRaw = enabledBuiltins.has('storyOutline') && typeof formatOutlinePrompt === 'function'
+        ? (formatOutlinePrompt() || '')
+        : '';
 
     // Render templates/macros
     const charBlock = await renderTemplateAll(charBlockRaw, env, messageVars);
@@ -1489,56 +1659,33 @@ async function buildPlannerMessages(rawUserInput) {
     const userInput = await renderTemplateAll(rawUserInput, env, messageVars);
     const storyOutline = outlineRaw.trim().length > 10 ? await renderTemplateAll(outlineRaw, env, messageVars) : '';
 
+    const builtinMessageFactories = {
+        charCard: () => String(charBlock).trim() ? { role: 'system', content: charBlock } : null,
+        worldbook: () => String(worldbook).trim() ? { role: 'system', content: worldbook } : null,
+        storyOutline: () => storyOutline.trim() ? { role: 'system', content: `<plot_map>\n${storyOutline}\n</plot_map>` } : null,
+        recentChat: () => String(recentChat).trim() ? { role: 'system', content: recentChat } : null,
+        storySummary: () => storySummary.trim() ? { role: 'system', content: `<story_summary>\n${storySummary}\n</story_summary>` } : null,
+        vectorsEnhanced: () => String(vector).trim() ? { role: 'system', content: vector } : null,
+        westWorldDirector: () => String(westWorldDirector).trim() ? { role: 'system', content: westWorldDirector } : null,
+        previousPlots: () => String(plots).trim() ? { role: 'system', content: plots } : null,
+        userInput: () => ({ role: 'user', content: `以下是玩家的最新指令哦~:\n[${userInput}]` }),
+    };
+    const promptBlockMap = new Map((s.promptBlocks || []).map(block => [block.id, block]));
     const messages = [];
-
-    // 1) Ena system prompts
-    for (const b of enaSystemBlocks) {
-        const content = await renderTemplateAll(b.content, env, messageVars);
-        messages.push({ role: 'system', content });
-    }
-
-    // 2) Character card
-    if (String(charBlock).trim()) messages.push({ role: 'system', content: charBlock });
-
-    // 3) Worldbook
-    if (String(worldbook).trim()) messages.push({ role: 'system', content: worldbook });
-
-    // 3.5) Story Outline / 剧情地图（小白板世界架构）
-    if (storyOutline.trim()) {
-        messages.push({ role: 'system', content: `<plot_map>\n${storyOutline}\n</plot_map>` });
-    }
-
-    // 4) Chat history (last 2 AI responses — floors N-1 & N-3)
-    if (String(recentChat).trim()) messages.push({ role: 'system', content: recentChat });
-
-    // 4.5) Story memory (小白X <剧情记忆> — after chat context, before plots)
-    if (storySummary.trim()) {
-        messages.push({ role: 'system', content: `<story_summary>\n${storySummary}\n</story_summary>` });
-    }
-
-    // 5) Vectors Enhanced knowledge recall for the planner
-    if (String(vector).trim()) messages.push({ role: 'system', content: vector });
-
-    // 5.5) WestWorld director execution sheet
-    if (String(westWorldDirector).trim()) messages.push({ role: 'system', content: westWorldDirector });
-
-    // 6) Previous plots
-    if (String(plots).trim()) messages.push({ role: 'system', content: plots });
-
-    // 7) User input (with friendly framing)
-    const userMsgContent = `以下是玩家的最新指令哦~:\n[${userInput}]`;
-    messages.push({ role: 'user', content: userMsgContent });
-
-    // Extra user blocks before user message
-    for (const b of enaUserBlocks) {
-        const content = await renderTemplateAll(b.content, env, messageVars);
-        messages.splice(Math.max(0, messages.length - 1), 0, { role: 'system', content: `【extra-user-block】\n${content}` });
-    }
-
-    // 8) Assistant blocks
-    for (const b of enaAssistantBlocks) {
-        const content = await renderTemplateAll(b.content, env, messageVars);
-        messages.push({ role: 'assistant', content });
+    for (const module of s.moduleChain || []) {
+        if (module?.enabled === false) continue;
+        if (module?.kind === 'builtin') {
+            const next = builtinMessageFactories[module.key]?.();
+            if (next && String(next.content || '').trim()) messages.push(next);
+            continue;
+        }
+        if (module?.kind === 'promptBlock' && enabledPromptBlocks.has(module.blockId)) {
+            const block = promptBlockMap.get(module.blockId);
+            if (!block || !String(block?.content ?? '').trim()) continue;
+            const content = await renderTemplateAll(block.content, env, messageVars);
+            if (!String(content).trim()) continue;
+            messages.push({ role: block.role || 'system', content });
+        }
     }
 
     const finalMessages = s.mergeConsecutiveSystemMessages ? mergeConsecutiveSystemMessages(messages) : messages;
@@ -1701,6 +1848,29 @@ function getIframeConfigPayload() {
     };
 }
 
+async function withTemporaryConfigPatch(patch, fn) {
+    const previous = config;
+    const draft = structuredClone(ensureSettings());
+    Object.assign(draft, patch || {});
+    config = draft;
+    ensureSettings();
+    try {
+        return await fn();
+    } finally {
+        config = previous;
+    }
+}
+
+async function buildPlannerPreview(rawUserInput, patch = {}) {
+    const input = String(rawUserInput || '').trim()
+        || String(getSendTextarea()?.value || '').trim()
+        || '（预览输入）请规划下一步剧情走向。';
+    return await withTemporaryConfigPatch(patch, async () => {
+        const { messages } = await buildPlannerMessages(input);
+        return messages;
+    });
+}
+
 function openSettings() {
     if (document.getElementById(OVERLAY_ID)) return;
 
@@ -1788,7 +1958,9 @@ async function handleIframeMessage(ev) {
         case 'xb-ena:reset-prompt-default': {
             const requestId = payload?.requestId || '';
             const s = ensureSettings();
-            s.promptBlocks = getDefaultSettings().promptBlocks;
+            const d = getDefaultSettings();
+            s.promptBlocks = d.promptBlocks;
+            s.moduleChain = d.moduleChain;
             const ok = await saveConfigNow();
             if (ok) {
                 postToIframe(iframe, {
@@ -1806,6 +1978,15 @@ async function handleIframeMessage(ev) {
                         requestId
                     }
                 });
+            }
+            break;
+        }
+        case 'xb-ena:preview-request': {
+            try {
+                const messages = await buildPlannerPreview(payload?.text || '', payload?.patch || {});
+                postToIframe(iframe, { type: 'xb-ena:preview-result', payload: { messages } });
+            } catch (err) {
+                postToIframe(iframe, { type: 'xb-ena:preview-error', payload: { message: String(err?.message ?? err) } });
             }
             break;
         }

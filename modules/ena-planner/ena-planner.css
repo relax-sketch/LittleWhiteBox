@@ -487,11 +487,34 @@ textarea.input {
   gap: 8px;
   flex: 1;
   min-width: 200px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .prompt-head-right {
   display: flex;
   gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.module-title {
+  font-weight: 600;
+  color: var(--txt);
+}
+
+.module-meta {
+  font-size: .75rem;
+  color: var(--txt3);
+}
+
+.module-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--txt2);
+  font-size: .75rem;
+  white-space: nowrap;
 }
 
 .prompt-block textarea.input {

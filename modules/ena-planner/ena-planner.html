@@ -199,7 +199,7 @@
         <div class="tip-box">
           <div class="tip-icon">💡</div>
           <div class="tip-text">
-            系统会自动在提示词之后注入：角色卡、世界书、剧情摘要、聊天历史、向量召回等上下文。你只需专注编写"规划指令"。
+            这里展示的模块顺序，就是发送给规划 API 的真实顺序。手写提示词块与角色卡、世界书、向量召回等上下文模块可以一起开关和排序。
           </div>
         </div>
 
@@ -226,12 +226,26 @@
         </section>
 
         <section class="card">
-          <div class="card-title">提示词块</div>
+          <div class="card-title">统一模块链</div>
           <div id="ep_prompt_list"></div>
-          <div class="prompt-empty" id="ep_prompt_empty" style="display:none;">暂无提示词块</div>
+          <div class="prompt-empty" id="ep_prompt_empty" style="display:none;">暂无模块</div>
           <div class="btn-group" style="margin-top:16px;">
             <button id="ep_add_prompt" class="btn">添加区块</button>
             <button id="ep_reset_prompt" class="btn btn-del">恢复默认</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">真实发送预览</div>
+          <div class="form-group">
+            <label class="form-label">预览输入（留空则读取当前输入框，仍为空时使用默认文本）</label>
+            <textarea id="ep_preview_input" class="input" rows="3" placeholder="输入一段测试文本，用当前模块链组装真实请求..."></textarea>
+          </div>
+          <div class="btn-group" style="margin-bottom:16px;">
+            <button id="ep_refresh_preview" class="btn btn-p">刷新真实发送预览</button>
+          </div>
+          <div id="ep_prompt_preview" class="msg-list">
+            <div class="log-empty">尚未生成预览</div>
           </div>
         </section>
       </div>
@@ -265,12 +279,7 @@
         <section class="card">
           <div class="card-title">向量知识库</div>
           <div class="form-group">
-            <label class="form-label">调用聊天记录管理器</label>
-            <select id="ep_vk_enabled" class="input">
-              <option value="false">关闭</option>
-              <option value="true">开启</option>
-            </select>
-            <p class="form-hint">剧情规划会把玩家最新输入当作普通查询，直接使用聊天记录管理器当前的任务、阈值、召回数量、查询指令和重排设置。</p>
+            <p class="form-hint">是否进入 Ena Planner 请求由“统一模块链”里的 VectorsEnhanced 模块控制。启用后，会把玩家最新输入当作普通查询，直接使用聊天记录管理器当前的任务、阈值、召回数量、查询指令和重排设置。</p>
             <button id="ep_vk_diagnose" class="btn" type="button">诊断聊天记录管理器查询</button>
             <pre id="ep_vk_diagnose_output" class="debug-output"></pre>
           </div>
@@ -280,12 +289,8 @@
           <div class="card-title">WestWorld 导演</div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">调用 WestWorld 导演执行单</label>
-              <select id="ep_ww_enabled" class="input">
-                <option value="false">关闭</option>
-                <option value="true">开启</option>
-              </select>
-              <p class="form-hint">开启后，发送前会先让 WestWorld 基于原始输入运行导演判定并写入 SillyTavern 预设，再用该导演执行单作为 Ena Planner 上下文。WestWorld 不可用时会自动跳过。</p>
+              <label class="form-label">启用位置</label>
+              <p class="form-hint">是否进入 Ena Planner 请求由“统一模块链”里的 WestWorld 模块控制。启用后，发送前会先让 WestWorld 基于原始输入运行导演判定并写入 SillyTavern 预设，再用该导演执行单作为上下文。</p>
             </div>
             <div class="form-group">
               <label class="form-label">最大读取字符数</label>
@@ -524,11 +529,84 @@
       return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    /* ── Prompt blocks ── */
+    /* ── Unified module chain ── */
 
-    function createPromptBlockElement(block, idx, total) {
+    const BUILTIN_MODULES = {
+      charCard: { name: '角色卡', role: 'system' },
+      worldbook: { name: '世界书', role: 'system' },
+      storyOutline: { name: '剧情地图', role: 'system' },
+      recentChat: { name: '最近聊天', role: 'system' },
+      storySummary: { name: '剧情记忆', role: 'system' },
+      vectorsEnhanced: { name: 'VectorsEnhanced', role: 'system' },
+      westWorldDirector: { name: 'WestWorld', role: 'system' },
+      previousPlots: { name: '历史 plot', role: 'system' },
+      userInput: { name: '玩家输入', role: 'user' },
+    };
+
+    function moveModule(idx, delta) {
+      const next = idx + delta;
+      if (!cfg?.moduleChain || next < 0 || next >= cfg.moduleChain.length) return;
+      [cfg.moduleChain[idx], cfg.moduleChain[next]] = [cfg.moduleChain[next], cfg.moduleChain[idx]];
+      renderPromptList();
+      scheduleSave();
+      schedulePreviewRefresh();
+    }
+
+    function createBuiltinModuleElement(module, idx, total) {
       const wrap = document.createElement('div');
-      wrap.className = 'prompt-block';
+      wrap.className = 'prompt-block module-card';
+
+      const head = document.createElement('div');
+      head.className = 'prompt-head';
+
+      const left = document.createElement('div');
+      left.className = 'prompt-head-left';
+
+      const def = BUILTIN_MODULES[module.key] || { name: module.key || '未知模块', role: 'system' };
+      const title = document.createElement('div');
+      title.className = 'module-title';
+      title.textContent = def.name;
+      const meta = document.createElement('div');
+      meta.className = 'module-meta';
+      meta.textContent = `内置模块 · ${def.role}`;
+      left.append(title, meta);
+
+      const right = document.createElement('div');
+      right.className = 'prompt-head-right';
+
+      const enabledLabel = document.createElement('label');
+      enabledLabel.className = 'module-toggle';
+      const enabledInput = document.createElement('input');
+      enabledInput.type = 'checkbox';
+      enabledInput.checked = module.enabled !== false;
+      enabledInput.addEventListener('change', () => {
+        module.enabled = enabledInput.checked;
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      enabledLabel.append(enabledInput, document.createTextNode('启用'));
+
+      const upBtn = document.createElement('button');
+      upBtn.className = 'btn btn-sm';
+      upBtn.textContent = '↑';
+      upBtn.disabled = idx === 0;
+      upBtn.addEventListener('click', () => moveModule(idx, -1));
+
+      const downBtn = document.createElement('button');
+      downBtn.className = 'btn btn-sm';
+      downBtn.textContent = '↓';
+      downBtn.disabled = idx === total - 1;
+      downBtn.addEventListener('click', () => moveModule(idx, 1));
+
+      right.append(enabledLabel, upBtn, downBtn);
+      head.append(left, right);
+      wrap.append(head);
+      return wrap;
+    }
+
+    function createPromptBlockElement(module, block, idx, total) {
+      const wrap = document.createElement('div');
+      wrap.className = 'prompt-block module-card';
 
       const head = document.createElement('div');
       head.className = 'prompt-head';
@@ -541,7 +619,10 @@
       nameInput.className = 'input';
       nameInput.placeholder = '块名称';
       nameInput.value = block.name || '';
-      nameInput.addEventListener('change', () => { block.name = nameInput.value; scheduleSave(); });
+      nameInput.addEventListener('change', () => {
+        block.name = nameInput.value;
+        scheduleSave();
+      });
 
       const roleSelect = document.createElement('select');
       roleSelect.className = 'input';
@@ -552,48 +633,63 @@
         opt.selected = (block.role || 'system') === r;
         roleSelect.appendChild(opt);
       });
-      roleSelect.addEventListener('change', () => { block.role = roleSelect.value; scheduleSave(); });
+      roleSelect.addEventListener('change', () => {
+        block.role = roleSelect.value;
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
 
       left.append(nameInput, roleSelect);
 
       const right = document.createElement('div');
       right.className = 'prompt-head-right';
 
+      const enabledLabel = document.createElement('label');
+      enabledLabel.className = 'module-toggle';
+      const enabledInput = document.createElement('input');
+      enabledInput.type = 'checkbox';
+      enabledInput.checked = module.enabled !== false;
+      enabledInput.addEventListener('change', () => {
+        module.enabled = enabledInput.checked;
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      enabledLabel.append(enabledInput, document.createTextNode('启用'));
+
       const upBtn = document.createElement('button');
       upBtn.className = 'btn btn-sm';
       upBtn.textContent = '↑';
       upBtn.disabled = idx === 0;
-      upBtn.addEventListener('click', () => {
-        if (idx === 0) return;
-        [cfg.promptBlocks[idx - 1], cfg.promptBlocks[idx]] = [cfg.promptBlocks[idx], cfg.promptBlocks[idx - 1]];
-        renderPromptList(); scheduleSave();
-      });
+      upBtn.addEventListener('click', () => moveModule(idx, -1));
 
       const downBtn = document.createElement('button');
       downBtn.className = 'btn btn-sm';
       downBtn.textContent = '↓';
       downBtn.disabled = idx === total - 1;
-      downBtn.addEventListener('click', () => {
-        if (idx >= total - 1) return;
-        [cfg.promptBlocks[idx], cfg.promptBlocks[idx + 1]] = [cfg.promptBlocks[idx + 1], cfg.promptBlocks[idx]];
-        renderPromptList(); scheduleSave();
-      });
+      downBtn.addEventListener('click', () => moveModule(idx, 1));
 
       const delBtn = document.createElement('button');
       delBtn.className = 'btn btn-sm btn-del';
       delBtn.textContent = '删除';
       delBtn.addEventListener('click', () => {
-        cfg.promptBlocks.splice(idx, 1);
-        renderPromptList(); scheduleSave();
+        cfg.promptBlocks = (cfg.promptBlocks || []).filter(item => item.id !== block.id);
+        cfg.moduleChain = (cfg.moduleChain || []).filter(item => !(item.kind === 'promptBlock' && item.blockId === block.id));
+        renderPromptList();
+        scheduleSave();
+        schedulePreviewRefresh();
       });
 
-      right.append(upBtn, downBtn, delBtn);
+      right.append(enabledLabel, upBtn, downBtn, delBtn);
 
       const content = document.createElement('textarea');
       content.className = 'input';
       content.placeholder = '提示词内容...';
       content.value = block.content || '';
-      content.addEventListener('change', () => { block.content = content.value; scheduleSave(); });
+      content.addEventListener('change', () => {
+        block.content = content.value;
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
 
       head.append(left, right);
       wrap.append(head, content);
@@ -603,12 +699,20 @@
     function renderPromptList() {
       const list = $('ep_prompt_list');
       const empty = $('ep_prompt_empty');
-      const blocks = cfg?.promptBlocks || [];
+      const chain = cfg?.moduleChain || [];
+      const blocks = new Map((cfg?.promptBlocks || []).map(block => [block.id, block]));
       list.innerHTML = '';
-      if (!blocks.length) { empty.style.display = ''; return; }
+      if (!chain.length) { empty.style.display = ''; return; }
       empty.style.display = 'none';
-      blocks.forEach((block, idx) => {
-        list.appendChild(createPromptBlockElement(block, idx, blocks.length));
+      chain.forEach((module, idx) => {
+        if (module.kind === 'builtin') {
+          list.appendChild(createBuiltinModuleElement(module, idx, chain.length));
+          return;
+        }
+        if (module.kind === 'promptBlock') {
+          const block = blocks.get(module.blockId);
+          if (block) list.appendChild(createPromptBlockElement(module, block, idx, chain.length));
+        }
       });
     }
 
@@ -716,6 +820,39 @@
       }).join('');
     }
 
+    let previewRefreshTimer = null;
+
+    function renderPromptPreview(messages) {
+      const body = $('ep_prompt_preview');
+      const list = Array.isArray(messages) ? messages : [];
+      if (!list.length) {
+        body.innerHTML = '<div class="log-empty">本次没有可发送消息</div>';
+        return;
+      }
+      body.innerHTML = list.map((m, i) => {
+        const role = escapeHtml(m.role || 'unknown');
+        const roleClass = role === 'system' ? 'msg-system' : role === 'user' ? 'msg-user' : 'msg-assistant';
+        return `<div class="msg-card ${roleClass}">
+          <div class="msg-role">[${i + 1}] ${role}</div>
+          <pre class="msg-content">${escapeHtml(m.content || '')}</pre>
+        </div>`;
+      }).join('');
+    }
+
+    function requestPromptPreview() {
+      const body = $('ep_prompt_preview');
+      if (body) body.innerHTML = '<div class="log-empty">生成预览中…</div>';
+      post('xb-ena:preview-request', {
+        text: $('ep_preview_input')?.value || '',
+        patch: collectPatch(),
+      });
+    }
+
+    function schedulePreviewRefresh() {
+      if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
+      previewRefreshTimer = setTimeout(requestPromptPreview, 350);
+    }
+
     /* ── Apply / Collect ── */
 
     function applyConfig(nextCfg) {
@@ -744,10 +881,7 @@
       $('ep_include_global_wb').value = String(toBool(cfg.includeGlobalWorldbooks, false));
       $('ep_wb_pos4').value = String(toBool(cfg.excludeWorldbookPosition4, true));
       $('ep_wb_exclude_names').value = arrToCsv(cfg.worldbookExcludeNames);
-      cfg.vectorKnowledge = cfg.vectorKnowledge || {};
-      $('ep_vk_enabled').value = String(toBool(cfg.vectorKnowledge.enabled, false));
       cfg.westWorldDirector = cfg.westWorldDirector || {};
-      $('ep_ww_enabled').value = String(toBool(cfg.westWorldDirector.enabled, false));
       $('ep_ww_max_length').value = String(toNum(cfg.westWorldDirector.maxLength, 4000));
       $('ep_plot_n').value = String(toNum(cfg.plotCount, 2));
       $('ep_keep_tags').value = arrToCsv(cfg.responseKeepTags || ['plot', 'note', 'plot-log', 'state']);
@@ -762,6 +896,7 @@
       renderTemplateSelect(keepSelectedTemplate);
       renderPromptList();
       renderLogs();
+      schedulePreviewRefresh();
     }
 
     function collectPatch() {
@@ -790,11 +925,13 @@
       p.includeGlobalWorldbooks = toBool($('ep_include_global_wb').value, false);
       p.excludeWorldbookPosition4 = toBool($('ep_wb_pos4').value, true);
       p.worldbookExcludeNames = csvToArr($('ep_wb_exclude_names').value);
+      const chain = cfg?.moduleChain || [];
+      const moduleEnabled = key => chain.find(item => item.kind === 'builtin' && item.key === key)?.enabled !== false;
       p.vectorKnowledge = {
-        enabled: toBool($('ep_vk_enabled').value, false),
+        enabled: moduleEnabled('vectorsEnhanced'),
       };
       p.westWorldDirector = {
-        enabled: toBool($('ep_ww_enabled').value, false),
+        enabled: moduleEnabled('westWorldDirector'),
         maxLength: Math.max(0, Math.min(20000, Math.floor(toNum($('ep_ww_max_length').value, 4000)))),
       };
       p.plotCount = Math.max(0, Math.floor(toNum($('ep_plot_n').value, 2)));
@@ -805,6 +942,7 @@
       p.logsMax = Math.max(1, Math.min(200, Math.floor(toNum($('ep_logs_max').value, 20))));
 
       p.promptBlocks = cfg?.promptBlocks || [];
+      p.moduleChain = cfg?.moduleChain || [];
       p.promptTemplates = cfg?.promptTemplates || {};
       p.activePromptTemplate = $('ep_tpl_select')?.value || '';
 
@@ -871,12 +1009,19 @@
 
       $('ep_add_prompt').addEventListener('click', () => {
         cfg.promptBlocks = cfg.promptBlocks || [];
-        cfg.promptBlocks.push({ id: genId(), role: 'system', name: '新块', content: '' });
-        renderPromptList(); scheduleSave();
+        cfg.moduleChain = cfg.moduleChain || [];
+        const block = { id: genId(), role: 'system', name: '新块', content: '' };
+        cfg.promptBlocks.push(block);
+        const userInputIndex = cfg.moduleChain.findIndex(item => item.kind === 'builtin' && item.key === 'userInput');
+        const insertAt = userInputIndex >= 0 ? userInputIndex : cfg.moduleChain.length;
+        cfg.moduleChain.splice(insertAt, 0, { kind: 'promptBlock', blockId: block.id, enabled: true });
+        renderPromptList();
+        scheduleSave();
+        schedulePreviewRefresh();
       });
 
       $('ep_reset_prompt').addEventListener('click', () => {
-        if (!confirm('确定恢复默认提示词块？当前提示词块将被覆盖。')) return;
+        if (!confirm('确定恢复默认模块链？当前提示词块与模块顺序将被覆盖。')) return;
         if (pendingSave) return;
         const requestId = `ena_reset_${Date.now()}`;
         startPendingSave(requestId);
@@ -887,17 +1032,23 @@
         const name = $('ep_tpl_select').value;
         cfg.activePromptTemplate = name;
         if (!name) return;
-        const blocks = cfg?.promptTemplates?.[name];
-        if (!Array.isArray(blocks)) return;
-        cfg.promptBlocks = structuredClone(blocks);
-        renderPromptList(); scheduleSave();
+        const template = cfg?.promptTemplates?.[name];
+        if (!template || typeof template !== 'object') return;
+        cfg.promptBlocks = structuredClone(template.promptBlocks || []);
+        cfg.moduleChain = structuredClone(template.moduleChain || []);
+        renderPromptList();
+        scheduleSave();
+        schedulePreviewRefresh();
       });
 
       $('ep_tpl_save').addEventListener('click', () => {
         const name = $('ep_tpl_select').value;
         if (!name) { setSaveIndicator('error', '请先选择或创建模板'); return; }
         cfg.promptTemplates = cfg.promptTemplates || {};
-        cfg.promptTemplates[name] = structuredClone(cfg.promptBlocks || []);
+        cfg.promptTemplates[name] = {
+          promptBlocks: structuredClone(cfg.promptBlocks || []),
+          moduleChain: structuredClone(cfg.moduleChain || []),
+        };
         cfg.activePromptTemplate = name;
         renderTemplateSelect(name); scheduleSave();
       });
@@ -906,7 +1057,10 @@
         const name = prompt('新模板名称');
         if (!name) return;
         cfg.promptTemplates = cfg.promptTemplates || {};
-        cfg.promptTemplates[name] = structuredClone(cfg.promptBlocks || []);
+        cfg.promptTemplates[name] = {
+          promptBlocks: structuredClone(cfg.promptBlocks || []),
+          moduleChain: structuredClone(cfg.moduleChain || []),
+        };
         cfg.activePromptTemplate = name;
         renderTemplateSelect(name); scheduleSave();
       });
@@ -929,6 +1083,9 @@
         renderTemplateSelect(undoState.name);
         clearUndo(); scheduleSave();
       });
+
+      $('ep_refresh_preview').addEventListener('click', requestPromptPreview);
+      $('ep_preview_input').addEventListener('input', schedulePreviewRefresh);
 
       $('ep_debug_worldbook').addEventListener('click', () => {
         $('ep_debug_output').classList.add('visible');
@@ -961,7 +1118,7 @@
 
       document.querySelectorAll('.card .input').forEach(el => {
         if (el.closest('.prompt-block')) return;
-        if (el.id === 'ep_test_input') return;
+        if (el.id === 'ep_test_input' || el.id === 'ep_preview_input') return;
         el.addEventListener('change', scheduleSave);
       });
     }
@@ -1024,6 +1181,12 @@
           }
           break;
         }
+        case 'xb-ena:preview-result':
+          renderPromptPreview(payload?.messages || []);
+          break;
+        case 'xb-ena:preview-error':
+          $('ep_prompt_preview').innerHTML = `<div class="log-error">${escapeHtml(payload?.message || '预览生成失败')}</div>`;
+          break;
       }
     });
 
