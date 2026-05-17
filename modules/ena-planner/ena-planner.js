@@ -64,8 +64,13 @@ function getDefaultSettings() {
         chatExcludeTags: ['行动选项', 'UpdateVariable', 'StatusPlaceHolderImpl'],
 
         // Worldbook: always read character-linked lorebooks by default
-        // User can also opt-in to include global worldbooks
-        includeGlobalWorldbooks: false,
+        // User can manage current/global sources independently
+        worldbookSelection: {
+            currentMode: 'linked', // linked | selected | off
+            currentSelectedNames: [],
+            globalMode: 'off', // active | selected | off
+            globalSelectedNames: [],
+        },
         excludeWorldbookPosition4: true,
         // Worldbook entry names containing these strings will be excluded
         worldbookExcludeNames: ['mvu_update'],
@@ -287,6 +292,18 @@ function ensureSettings() {
         const maxLength = Math.max(0, Math.min(20000, parseInt(ww.maxLength, 10) || d.westWorldDirector.maxLength));
         ww.maxLength = maxLength;
     }
+    if (!s.worldbookSelection || typeof s.worldbookSelection !== 'object') {
+        s.worldbookSelection = structuredClone(d.worldbookSelection);
+        if (s.includeGlobalWorldbooks) s.worldbookSelection.globalMode = 'active';
+    } else {
+        const wb = s.worldbookSelection;
+        const allowedCurrentModes = new Set(['linked', 'selected', 'off']);
+        const allowedGlobalModes = new Set(['active', 'selected', 'off']);
+        wb.currentMode = allowedCurrentModes.has(wb.currentMode) ? wb.currentMode : d.worldbookSelection.currentMode;
+        wb.globalMode = allowedGlobalModes.has(wb.globalMode) ? wb.globalMode : d.worldbookSelection.globalMode;
+        wb.currentSelectedNames = Array.isArray(wb.currentSelectedNames) ? wb.currentSelectedNames.filter(Boolean) : [];
+        wb.globalSelectedNames = Array.isArray(wb.globalSelectedNames) ? wb.globalSelectedNames.filter(Boolean) : [];
+    }
     if (!Array.isArray(s.promptBlocks)) s.promptBlocks = structuredClone(d.promptBlocks);
     if (!hadModuleChain) {
         const legacyPromptBlocks = structuredClone(s.promptBlocks);
@@ -305,6 +322,7 @@ function ensureSettings() {
     delete s.includeVectorRecall;
     delete s.historyMessageCount;
     delete s.worldbookActivationMode;
+    delete s.includeGlobalWorldbooks;
 
     config = s;
     return s;
@@ -795,8 +813,7 @@ function formatPlotsBlock(plotList) {
 /**
  * -------------------------
  * Worldbook — read via ST API (like idle-watcher)
- * Always read character-linked worldbooks.
- * Optionally include global worldbooks.
+ * Current/global sources can be auto-resolved or manually selected.
  * Activation: constant (blue) + keyword scan (green) only.
  * --------------------------
  */
@@ -886,6 +903,39 @@ async function getGlobalWorldbooks() {
     return [];
 }
 
+async function getAvailableWorldbookNames() {
+    try {
+        const ctx = getContextSafe();
+        const names = ctx?.getWorldInfoNames?.();
+        if (Array.isArray(names)) return names.filter(Boolean);
+    } catch { }
+    try {
+        const names = await window.xiaobaixWorldbookService?.listWorldbooks?.();
+        if (Array.isArray(names)) return names.filter(Boolean);
+    } catch { }
+    return [];
+}
+
+async function resolvePlannerWorldbookNames() {
+    const s = ensureSettings();
+    const wb = s.worldbookSelection || {};
+    const currentWorldNames = wb.currentMode === 'selected'
+        ? (wb.currentSelectedNames || []).filter(Boolean)
+        : wb.currentMode === 'linked'
+            ? await getCharacterWorldbooks()
+            : [];
+    const globalWorldNames = wb.globalMode === 'selected'
+        ? (wb.globalSelectedNames || []).filter(Boolean)
+        : wb.globalMode === 'active'
+            ? await getGlobalWorldbooks()
+            : [];
+    return {
+        currentWorldNames: [...new Set(currentWorldNames)],
+        globalWorldNames: [...new Set(globalWorldNames)],
+        allWorldNames: [...new Set([...currentWorldNames, ...globalWorldNames])],
+    };
+}
+
 async function getWorldbookData(worldName) {
     if (!worldName) return null;
     try {
@@ -961,18 +1011,7 @@ function sortWorldEntries(entries) {
 
 async function buildWorldbookBlock(scanText) {
     const s = ensureSettings();
-
-    // 1. Always get character-linked worldbooks
-    const charWorldNames = await getCharacterWorldbooks();
-
-    // 2. Optionally get global worldbooks
-    let globalWorldNames = [];
-    if (s.includeGlobalWorldbooks) {
-        globalWorldNames = await getGlobalWorldbooks();
-    }
-
-    // Deduplicate
-    const allWorldNames = [...new Set([...charWorldNames, ...globalWorldNames])];
+    const { allWorldNames } = await resolvePlannerWorldbookNames();
 
     if (!allWorldNames.length) {
         console.log('[EnaPlanner] No worldbooks to load');
@@ -1403,11 +1442,21 @@ async function fetchModelsForUi() {
 
 async function debugWorldbookForUi() {
     let out = '正在诊断世界书读取...\n';
-    const charWb = await getCharacterWorldbooks();
-    out += `角色世界书名称: ${JSON.stringify(charWb)}\n`;
-    const globalWb = await getGlobalWorldbooks();
-    out += `全局世界书名称: ${JSON.stringify(globalWb)}\n`;
-    const all = [...new Set([...charWb, ...globalWb])];
+    const s = ensureSettings();
+    const available = await getAvailableWorldbookNames();
+    const autoCurrent = await getCharacterWorldbooks();
+    const autoGlobal = await getGlobalWorldbooks();
+    const resolved = await resolvePlannerWorldbookNames();
+    out += `可用世界书: ${JSON.stringify(available)}\n`;
+    out += `当前世界书模式: ${s.worldbookSelection?.currentMode}\n`;
+    out += `当前绑定世界书: ${JSON.stringify(autoCurrent)}\n`;
+    out += `当前手动选择: ${JSON.stringify(s.worldbookSelection?.currentSelectedNames || [])}\n`;
+    out += `本次实际读取当前世界书: ${JSON.stringify(resolved.currentWorldNames)}\n`;
+    out += `全局世界书模式: ${s.worldbookSelection?.globalMode}\n`;
+    out += `当前激活全局世界书: ${JSON.stringify(autoGlobal)}\n`;
+    out += `全局手动选择: ${JSON.stringify(s.worldbookSelection?.globalSelectedNames || [])}\n`;
+    out += `本次实际读取全局世界书: ${JSON.stringify(resolved.globalWorldNames)}\n`;
+    const all = resolved.allWorldNames;
     for (const name of all) {
         const data = await getWorldbookData(name);
         const count = data?.entries?.length ?? 0;
@@ -1850,6 +1899,13 @@ function getIframeConfigPayload() {
     };
 }
 
+async function getWorldbookOptionsForUi() {
+    const available = await getAvailableWorldbookNames();
+    const linkedCurrent = await getCharacterWorldbooks();
+    const activeGlobal = await getGlobalWorldbooks();
+    return { available, linkedCurrent, activeGlobal };
+}
+
 async function withTemporaryConfigPatch(patch, fn) {
     const previous = config;
     const draft = structuredClone(ensureSettings());
@@ -2014,6 +2070,15 @@ async function handleIframeMessage(ev) {
         case 'xb-ena:vector-tasks-request': {
             const tasks = getVectorsEnhancedTaskOptionsForUi();
             postToIframe(iframe, { type: 'xb-ena:vector-tasks', payload: { tasks } });
+            break;
+        }
+        case 'xb-ena:worldbooks-request': {
+            try {
+                const worldbooks = await getWorldbookOptionsForUi();
+                postToIframe(iframe, { type: 'xb-ena:worldbooks', payload: worldbooks });
+            } catch (err) {
+                postToIframe(iframe, { type: 'xb-ena:worldbooks-error', payload: { message: String(err?.message ?? err) } });
+            }
             break;
         }
         case 'xb-ena:fetch-models': {

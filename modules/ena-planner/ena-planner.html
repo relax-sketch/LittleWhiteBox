@@ -256,12 +256,38 @@
           <div class="card-title">世界书</div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">读取全局世界书</label>
-              <select id="ep_include_global_wb" class="input">
-                <option value="false">否</option>
-                <option value="true">是</option>
+              <label class="form-label">当前世界书</label>
+              <select id="ep_wb_current_mode" class="input">
+                <option value="linked">自动读取当前绑定</option>
+                <option value="selected">手动选择</option>
+                <option value="off">关闭</option>
               </select>
             </div>
+            <div class="form-group">
+              <label class="form-label">全局世界书</label>
+              <select id="ep_wb_global_mode" class="input">
+                <option value="off">关闭</option>
+                <option value="active">自动读取当前激活</option>
+                <option value="selected">手动选择</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">手动选择当前世界书</label>
+              <select id="ep_wb_current_selected" class="input" multiple size="6"></select>
+              <p class="form-hint" id="ep_wb_current_hint"></p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">手动选择全局世界书</label>
+              <select id="ep_wb_global_selected" class="input" multiple size="6"></select>
+              <p class="form-hint" id="ep_wb_global_hint"></p>
+            </div>
+          </div>
+          <div class="btn-group" style="margin-bottom:16px;">
+            <button id="ep_wb_refresh" class="btn" type="button">刷新世界书列表</button>
+          </div>
+          <div class="form-row">
             <div class="form-group">
               <label class="form-label">排除 position=4 的条目</label>
               <select id="ep_wb_pos4" class="input">
@@ -402,6 +428,7 @@
     let undoState = null;
     let undoPending = false;
     let fetchedModels = [];
+    let worldbookOptions = { available: [], linkedCurrent: [], activeGlobal: [] };
 
     /* ── Save indicator ── */
 
@@ -771,6 +798,49 @@
       $('ep_model_selector').classList.remove('hidden');
     }
 
+    function getSelectedValues(selectEl) {
+      return Array.from(selectEl?.selectedOptions || []).map(opt => opt.value).filter(Boolean);
+    }
+
+    function renderWorldbookSelect(selectId, selectedValues = []) {
+      const el = $(selectId);
+      if (!el) return;
+      const selected = new Set(selectedValues || []);
+      const names = [...new Set([...(worldbookOptions.available || []), ...(selectedValues || [])])];
+      el.innerHTML = '';
+      names.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = selected.has(name);
+        el.appendChild(opt);
+      });
+    }
+
+    function updateWorldbookModeUI() {
+      const currentMode = $('ep_wb_current_mode')?.value || 'linked';
+      const globalMode = $('ep_wb_global_mode')?.value || 'off';
+      $('ep_wb_current_selected').disabled = currentMode !== 'selected';
+      $('ep_wb_global_selected').disabled = globalMode !== 'selected';
+      $('ep_wb_current_hint').textContent = currentMode === 'linked'
+        ? `当前绑定：${(worldbookOptions.linkedCurrent || []).join(', ') || '无'}`
+        : currentMode === 'off'
+          ? '已关闭'
+          : '按住 Ctrl / Cmd 可多选';
+      $('ep_wb_global_hint').textContent = globalMode === 'active'
+        ? `当前激活：${(worldbookOptions.activeGlobal || []).join(', ') || '无'}`
+        : globalMode === 'off'
+          ? '已关闭'
+          : '按住 Ctrl / Cmd 可多选';
+    }
+
+    function renderWorldbookOptions() {
+      const wb = cfg?.worldbookSelection || {};
+      renderWorldbookSelect('ep_wb_current_selected', wb.currentSelectedNames || []);
+      renderWorldbookSelect('ep_wb_global_selected', wb.globalSelectedNames || []);
+      updateWorldbookModeUI();
+    }
+
     /* ── Logs ── */
 
     function renderLogs() {
@@ -878,7 +948,9 @@
       $('ep_fp').value = api.frequency_penalty ?? '';
       $('ep_mt').value = api.max_tokens ?? '';
 
-      $('ep_include_global_wb').value = String(toBool(cfg.includeGlobalWorldbooks, false));
+      cfg.worldbookSelection = cfg.worldbookSelection || {};
+      $('ep_wb_current_mode').value = cfg.worldbookSelection.currentMode || 'linked';
+      $('ep_wb_global_mode').value = cfg.worldbookSelection.globalMode || 'off';
       $('ep_wb_pos4').value = String(toBool(cfg.excludeWorldbookPosition4, true));
       $('ep_wb_exclude_names').value = arrToCsv(cfg.worldbookExcludeNames);
       cfg.westWorldDirector = cfg.westWorldDirector || {};
@@ -895,6 +967,7 @@
       const keepSelectedTemplate = cfg?.activePromptTemplate || $('ep_tpl_select')?.value || '';
       renderTemplateSelect(keepSelectedTemplate);
       renderPromptList();
+      renderWorldbookOptions();
       renderLogs();
       schedulePreviewRefresh();
     }
@@ -922,7 +995,12 @@
         max_tokens: $('ep_mt').value.trim()
       };
 
-      p.includeGlobalWorldbooks = toBool($('ep_include_global_wb').value, false);
+      p.worldbookSelection = {
+        currentMode: $('ep_wb_current_mode').value,
+        currentSelectedNames: getSelectedValues($('ep_wb_current_selected')),
+        globalMode: $('ep_wb_global_mode').value,
+        globalSelectedNames: getSelectedValues($('ep_wb_global_selected')),
+      };
       p.excludeWorldbookPosition4 = toBool($('ep_wb_pos4').value, true);
       p.worldbookExcludeNames = csvToArr($('ep_wb_exclude_names').value);
       const chain = cfg?.moduleChain || [];
@@ -977,6 +1055,25 @@
       });
 
       $('ep_prefix_mode').addEventListener('change', updatePrefixModeUI);
+      $('ep_wb_current_mode').addEventListener('change', () => {
+        updateWorldbookModeUI();
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_wb_global_mode').addEventListener('change', () => {
+        updateWorldbookModeUI();
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_wb_current_selected').addEventListener('change', () => {
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_wb_global_selected').addEventListener('change', () => {
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_wb_refresh').addEventListener('click', () => post('xb-ena:worldbooks-request'));
       $('ep_vk_diagnose').addEventListener('click', () => {
         const out = $('ep_vk_diagnose_output');
         out.classList.add('visible');
@@ -1171,6 +1268,18 @@
         case 'xb-ena:models-error':
           setLocalStatus('ep_api_status', payload?.message || '拉取模型失败', 'error');
           break;
+        case 'xb-ena:worldbooks':
+          worldbookOptions = {
+            available: Array.isArray(payload?.available) ? payload.available : [],
+            linkedCurrent: Array.isArray(payload?.linkedCurrent) ? payload.linkedCurrent : [],
+            activeGlobal: Array.isArray(payload?.activeGlobal) ? payload.activeGlobal : [],
+          };
+          renderWorldbookOptions();
+          break;
+        case 'xb-ena:worldbooks-error':
+          $('ep_wb_current_hint').textContent = payload?.message || '世界书列表读取失败';
+          $('ep_wb_global_hint').textContent = payload?.message || '世界书列表读取失败';
+          break;
         case 'xb-ena:debug-output': {
           const out = $('ep_debug_output');
           out.classList.add('visible');
@@ -1195,6 +1304,7 @@
     bindEvents();
     post('xb-ena:ready');
     post('xb-ena:vector-tasks-request');
+    post('xb-ena:worldbooks-request');
   </script>
 </body>
 
