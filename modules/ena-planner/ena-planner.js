@@ -606,6 +606,28 @@ function applyVectorKnowledgeTemplate(text) {
     return `<planner_vector_knowledge>\n${body}\n</planner_vector_knowledge>`;
 }
 
+function getVectorKnowledgeBlocks(result) {
+    if (!Array.isArray(result?.results)) return [];
+    return result.results
+        .map(item => String(item?.text || '').trim())
+        .filter(Boolean);
+}
+
+function buildVectorKnowledgeBody(result) {
+    const rawText = String(result?.rawText || result?.text || '').trim();
+    const blocks = getVectorKnowledgeBlocks(result);
+    if (!blocks.length) return { body: rawText, blocks };
+
+    // VectorsEnhanced normally returns one preformatted rawText carrying every hit.
+    // If a formatting step drops any hit, fall back to the explicit result list so
+    // the module chain never collapses multiple recalled chunks into one chunk.
+    const rawCarriesEveryBlock = !!rawText && blocks.every(block => rawText.includes(block));
+    return {
+        body: rawCarriesEveryBlock ? rawText : blocks.join('\n\n'),
+        blocks,
+    };
+}
+
 async function waitForVectorsEnhancedApi(methodName, timeoutMs = 3000) {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
@@ -633,11 +655,14 @@ async function buildVectorsEnhancedKnowledge(rawUserInput, parts = {}) {
         template: '{{text}}',
     });
 
-    const raw = String(result?.text || result?.rawText || '').trim();
+    const { body: raw, blocks } = buildVectorKnowledgeBody(result);
     if (!raw) return { text: '', stats: result?.stats || null, error: '' };
     return {
         text: applyVectorKnowledgeTemplate(raw),
-        stats: result?.stats || null,
+        stats: {
+            ...(result?.stats || {}),
+            carriedCount: blocks.length || Number(result?.stats?.finalCount || 0),
+        },
         error: '',
     };
 }
