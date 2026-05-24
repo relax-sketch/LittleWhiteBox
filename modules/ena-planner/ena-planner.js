@@ -7,7 +7,13 @@ import { extensionFolderPath } from '../../core/constants.js';
 import { EnaPlannerStorage } from '../../core/server-storage.js';
 import { postToIframe, isTrustedIframeEvent } from '../../core/iframe-messaging.js';
 import { DEFAULT_PROMPT_BLOCKS, BUILTIN_TEMPLATES } from './ena-planner-presets.js';
-import { ensureDicePromptModule, normalizeDiceSystemSettings } from './ena-planner-dice.js';
+import {
+    DICE_PROMPT_BLOCK_ID,
+    buildDiceTurnContext,
+    buildFinalInputWithDiceFallback,
+    ensureDicePromptModule,
+    normalizeDiceSystemSettings,
+} from './ena-planner-dice.js';
 import { getDefaultApiPrefix, joinApiUrl, resolveApiBaseUrl } from '../../shared/common/openai-url-utils.js';
 import { formatOutlinePrompt } from '../story-outline/story-outline.js';
 import { shouldSendOnEnter } from '../../../../../../scripts/RossAscends-mods.js';
@@ -1744,6 +1750,7 @@ async function buildPlannerMessages(rawUserInput) {
     };
     const promptBlockMap = new Map((s.promptBlocks || []).map(block => [block.id, block]));
     const messages = [];
+    let diceFallbackPrompt = '';
     for (const module of s.moduleChain || []) {
         if (module?.enabled === false) continue;
         if (module?.kind === 'builtin') {
@@ -1754,6 +1761,18 @@ async function buildPlannerMessages(rawUserInput) {
         if (module?.kind === 'promptBlock' && enabledPromptBlocks.has(module.blockId)) {
             const block = promptBlockMap.get(module.blockId);
             if (!block || !String(block?.content ?? '').trim()) continue;
+            if (block.id === DICE_PROMPT_BLOCK_ID) {
+                const diceContext = await buildDiceTurnContext(
+                    s.diceSystem,
+                    block.content,
+                    template => renderTemplateAll(template, env, messageVars),
+                );
+                diceFallbackPrompt = diceContext.fallbackPrompt;
+                if (diceContext.plannerPrompt) {
+                    messages.push({ role: 'system', content: diceContext.plannerPrompt });
+                }
+                continue;
+            }
             const content = await renderTemplateAll(block.content, env, messageVars);
             if (!String(content).trim()) continue;
             messages.push({ role: block.role || 'system', content });
@@ -1776,6 +1795,7 @@ async function buildPlannerMessages(rawUserInput) {
             westWorldDirectorError,
             cachedSummaryLen: cachedSummary.length,
             plotsRaw,
+            diceFallbackPrompt,
         },
     };
 }
@@ -1792,10 +1812,12 @@ async function runPlanningOnce(rawUserInput, silent = false, options = {}) {
         time: nowISO(), ok: false, model: s.api.model,
         requestMessages: [], rawReply: '', filteredReply: '', error: ''
     };
+    let diceFallbackPrompt = '';
 
     try {
         const { messages, meta } = await buildPlannerMessages(rawUserInput);
         log.requestMessages = messages;
+        diceFallbackPrompt = String(meta?.diceFallbackPrompt || '');
 
         const rawReply = await callPlanner(messages, options);
         log.rawReply = rawReply;
@@ -1817,10 +1839,13 @@ async function runPlanningOnce(rawUserInput, silent = false, options = {}) {
         log.ok = true;
 
         state.logs.unshift(log); clampLogs(); persistLogsMaybe();
-        return { rawReply, filtered };
+        return { rawReply, filtered, diceFallbackPrompt };
     } catch (e) {
         log.error = String(e?.message ?? e);
         state.logs.unshift(log); clampLogs(); persistLogsMaybe();
+        if (options.allowDiceFallbackOnError && diceFallbackPrompt) {
+            return { rawReply: '', filtered: '', diceFallbackPrompt, plannerError: e };
+        }
         if (!silent) toastErr(log.error);
         throw e;
     }
@@ -1863,7 +1888,8 @@ async function doInterceptAndPlanThenSend() {
             toastInfo(`WestWorld 导演：跳过（${westWorldPrepared.reason}）`);
         }
         toastInfo('Ena Planner：正在规划…');
-        const { filtered } = await runPlanningOnce(raw, false, {
+        const { filtered, diceFallbackPrompt, plannerError } = await runPlanningOnce(raw, false, {
+            allowDiceFallbackOnError: true,
             onDelta(_piece, full) {
                 if (!state.isPlanning) return;
                 if (!ensureSettings().api.stream) return;
@@ -1871,7 +1897,10 @@ async function doInterceptAndPlanThenSend() {
                 ta.value = `${raw}\n\n${preview}`.trim();
             }
         });
-        const merged = `${raw}\n\n${filtered}`.trim();
+        if (plannerError) {
+            toastInfo('Ena Planner：规划不可用，已改由正文按本轮骰子规则处理');
+        }
+        const merged = buildFinalInputWithDiceFallback(raw, filtered, diceFallbackPrompt);
         ta.value = merged;
         state.lastInjectedText = merged;
 

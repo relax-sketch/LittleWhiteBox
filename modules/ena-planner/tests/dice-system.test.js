@@ -94,3 +94,32 @@ test('default presets and runtime normalize the protected dice module and indepe
     assert.match(runtime, /ensureDicePromptModule/);
     assert.match(runtime, /s\.promptTemplates\s*=\s*normalizePromptTemplates/);
 });
+
+test('planner runtime resolves dice while visiting module order and keeps cached fallback through API failure', async () => {
+    const source = await readFile(new URL('../ena-planner.js', import.meta.url), 'utf8');
+    const builderStart = source.indexOf('async function buildPlannerMessages');
+    const chainLoop = source.indexOf('for (const module of s.moduleChain || [])', builderStart);
+    const diceBuild = source.indexOf('buildDiceTurnContext(', builderStart);
+
+    assert.ok(builderStart >= 0);
+    assert.ok(diceBuild > chainLoop, 'dice must resolve only at its module-chain position');
+    assert.match(source, /meta:\s*\{[\s\S]*diceFallbackPrompt/);
+    assert.match(source, /allowDiceFallbackOnError/);
+    assert.match(source, /buildFinalInputWithDiceFallback\(\s*raw,\s*filtered,\s*diceFallbackPrompt\s*\)/s);
+});
+
+test('an unavailable planner output reuses its previously resolved pool without a second render', async () => {
+    let renderCalls = 0;
+    const context = await buildDiceTurnContext(
+        { enabled: true },
+        'D20: [{{roll:1d20}}]',
+        async source => {
+            renderCalls += 1;
+            return source.replace('{{roll:1d20}}', '4');
+        },
+    );
+    const releasedInput = buildFinalInputWithDiceFallback('attack', '', context.fallbackPrompt);
+    assert.equal(renderCalls, 1);
+    assert.match(releasedInput, /D20: \[4\]/);
+    assert.doesNotMatch(releasedInput, /{{roll:/);
+});

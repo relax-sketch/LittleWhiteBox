@@ -58,3 +58,4 @@
 - 设计限定 EnaPlanner 只兜底规划阶段无法得到内容的情形；正文请求已放行提交后的失败不自动重发，以避免无法判断服务器是否已生成而产生重复回复。
 - 用户已批准 `docs/superpowers/specs/2026-05-24-ena-planner-dice-system-design.md`，实现应严格覆盖其中的主开关、受保护链内模块、同轮一次解析复用和规划异常兜底边界。
 - 实现中的模板/配置迁移以 `ensureDicePromptModule()` 为单一约束点：旧模板缺块时插入一次，已有块的内容与位置不被默认文本覆盖，同时固定其 `system` 身份与启用标记。
+- 运行时在 `buildPlannerMessages()` 遍历骰子块时生成 `diceFallbackPrompt`，并在 `callPlanner()` 之前完成；`runPlanningOnce()` 的 API 异常恢复分支只返回该字符串，不会再次调用模板或宏渲染。

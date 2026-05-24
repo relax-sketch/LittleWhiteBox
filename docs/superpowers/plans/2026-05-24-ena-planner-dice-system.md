@@ -400,7 +400,7 @@ git commit -m "Integrate dice block into EnaPlanner configuration"
 - Modify: `modules/ena-planner/tests/dice-system.test.js`
 - Modify: `modules/ena-planner/ena-planner.js:1615-1882`
 
-- [ ] **Step 1: Add failing assertions for ordered construction and recoverable planner failure**
+- [x] **Step 1: Add failing assertions for ordered construction and recoverable planner failure**
 
 Append to `modules/ena-planner/tests/dice-system.test.js`:
 
@@ -435,13 +435,13 @@ test('an unavailable planner output reuses its previously resolved pool without 
 });
 ```
 
-- [ ] **Step 2: Run the test and confirm runtime fallback is not yet wired**
+- [x] **Step 2: Run the test and confirm runtime fallback is not yet wired**
 
 Run: `npm run test:ena-planner`
 
 Expected: FAIL because `buildPlannerMessages()` has no dice turn metadata and the interception flow does not call `buildFinalInputWithDiceFallback()`.
 
-- [ ] **Step 3: Resolve the enabled dice block exactly once at its configured chain position**
+- [x] **Step 3: Resolve the enabled dice block exactly once at its configured chain position**
 
 Within `buildPlannerMessages(rawUserInput)`, initialize per-turn cached fallback before traversing the chain:
 
@@ -477,7 +477,7 @@ Add cached content to the existing returned metadata:
             diceFallbackPrompt,
 ```
 
-- [ ] **Step 4: Preserve resolved fallback across planner errors and use it only when planning is empty**
+- [x] **Step 4: Preserve resolved fallback across planner errors and use it only when planning is empty**
 
 Change `runPlanningOnce()` so message construction happens before its API failure recovery decision and returns cached fallback on permitted errors:
 
@@ -536,7 +536,7 @@ Preserve any current log size limiting and toast behavior surrounding this funct
 
 This error branch must use the already returned `diceFallbackPrompt` and must not call `buildPlannerMessages()` or `renderTemplateAll()` again.
 
-- [ ] **Step 5: Run focused tests and commit runtime behavior**
+- [x] **Step 5: Run focused tests and commit runtime behavior**
 
 Run: `npm run test:ena-planner`
 

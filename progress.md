@@ -41,3 +41,5 @@
 - Task 1 GREEN：新增骰子纯逻辑模块与 `test:ena-planner` 入口后，`npm run test:ena-planner` 的 5 项测试全部通过。
 - Task 2 RED：新增默认模板/配置接线测试后，测试因 preset 尚未引用受保护骰子块而失败。
 - Task 2 GREEN：默认 preset、`diceSystem.enabled` 及配置/模板迁移接线完成；调整允许合法尾随逗号的源码断言后，6 项测试全部通过。
+- Task 3 RED：新增运行时顺序/错误兜底接线测试后，测试因链遍历尚未构造骰子上下文而失败。
+- Task 3 GREEN：`buildPlannerMessages()` 在骰子模块位置解析一次并缓存 fallback，`runPlanningOnce()` 与正文放行路径复用缓存处理空回或 API 异常；8 项测试全部通过。
