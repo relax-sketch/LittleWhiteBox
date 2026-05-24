@@ -7,7 +7,6 @@ import { extensionFolderPath } from '../../core/constants.js';
 import { EnaPlannerStorage } from '../../core/server-storage.js';
 import { postToIframe, isTrustedIframeEvent } from '../../core/iframe-messaging.js';
 import { DEFAULT_PROMPT_BLOCKS, BUILTIN_TEMPLATES } from './ena-planner-presets.js';
-import { buildDiceTurnContext, buildFinalInputWithDiceFallback, normalizeDiceSystemSettings } from './ena-planner-dice.js';
 import { getDefaultApiPrefix, joinApiUrl, resolveApiBaseUrl } from '../../shared/common/openai-url-utils.js';
 import { formatOutlinePrompt } from '../story-outline/story-outline.js';
 import { shouldSendOnEnter } from '../../../../../../scripts/RossAscends-mods.js';
@@ -60,9 +59,6 @@ function getDefaultSettings() {
         enabled: true,
         skipIfPlotPresent: true,
         mergeConsecutiveSystemMessages: false,
-        diceSystem: {
-            enabled: false,
-        },
 
         // Chat history: tags to strip from AI responses (besides <think>)
         chatExcludeTags: ['行动选项', 'UpdateVariable', 'StatusPlaceHolderImpl'],
@@ -275,7 +271,6 @@ function ensureSettings() {
         }
     }
     deepMerge(s, d);
-    s.diceSystem = normalizeDiceSystemSettings(s.diceSystem);
     if (!Array.isArray(s.responseKeepTags)) s.responseKeepTags = structuredClone(d.responseKeepTags);
     else s.responseKeepTags = normalizeResponseKeepTags(s.responseKeepTags);
     if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
@@ -1624,10 +1619,6 @@ async function buildPlannerMessages(rawUserInput) {
     const charObj = getCurrentCharSafe();
     const env = await prepareEjsEnv();
     const messageVars = getLatestMessageVarTable();
-    const diceTurnContext = await buildDiceTurnContext(
-        s.diceSystem,
-        text => renderTemplateAll(text, env, messageVars),
-    );
 
     const enabledBuiltins = new Set((s.moduleChain || [])
         .filter(item => item?.kind === 'builtin' && item.enabled !== false)
@@ -1745,9 +1736,6 @@ async function buildPlannerMessages(rawUserInput) {
     };
     const promptBlockMap = new Map((s.promptBlocks || []).map(block => [block.id, block]));
     const messages = [];
-    if (diceTurnContext.plannerPrompt) {
-        messages.push({ role: 'system', content: diceTurnContext.plannerPrompt });
-    }
     for (const module of s.moduleChain || []) {
         if (module?.enabled === false) continue;
         if (module?.kind === 'builtin') {
@@ -1778,7 +1766,6 @@ async function buildPlannerMessages(rawUserInput) {
             westWorldDirectorRaw,
             westWorldDirectorMeta,
             westWorldDirectorError,
-            diceFallbackPrompt: diceTurnContext.fallbackPrompt,
             cachedSummaryLen: cachedSummary.length,
             plotsRaw,
         },
@@ -1822,7 +1809,7 @@ async function runPlanningOnce(rawUserInput, silent = false, options = {}) {
         log.ok = true;
 
         state.logs.unshift(log); clampLogs(); persistLogsMaybe();
-        return { rawReply, filtered, diceFallbackPrompt: meta?.diceFallbackPrompt || '' };
+        return { rawReply, filtered };
     } catch (e) {
         log.error = String(e?.message ?? e);
         state.logs.unshift(log); clampLogs(); persistLogsMaybe();
@@ -1868,7 +1855,7 @@ async function doInterceptAndPlanThenSend() {
             toastInfo(`WestWorld 导演：跳过（${westWorldPrepared.reason}）`);
         }
         toastInfo('Ena Planner：正在规划…');
-        const { filtered, diceFallbackPrompt } = await runPlanningOnce(raw, false, {
+        const { filtered } = await runPlanningOnce(raw, false, {
             onDelta(_piece, full) {
                 if (!state.isPlanning) return;
                 if (!ensureSettings().api.stream) return;
@@ -1876,7 +1863,7 @@ async function doInterceptAndPlanThenSend() {
                 ta.value = `${raw}\n\n${preview}`.trim();
             }
         });
-        const merged = buildFinalInputWithDiceFallback(raw, filtered, diceFallbackPrompt);
+        const merged = `${raw}\n\n${filtered}`.trim();
         ta.value = merged;
         state.lastInjectedText = merged;
 
