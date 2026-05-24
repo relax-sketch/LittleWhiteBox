@@ -39,3 +39,5 @@
 - 已启动 `superpowers:executing-plans` 与 `superpowers:test-driven-development`，首先编写骰子领域辅助逻辑的失败测试。
 - Task 1 RED：`node --test modules/ena-planner/tests/dice-system.test.js` 因预期缺少 `ena-planner-dice.js` 而以 `ERR_MODULE_NOT_FOUND` 失败。
 - Task 1 GREEN：新增骰子纯逻辑模块与 `test:ena-planner` 入口后，`npm run test:ena-planner` 的 5 项测试全部通过。
+- Task 2 RED：新增默认模板/配置接线测试后，测试因 preset 尚未引用受保护骰子块而失败。
+- Task 2 GREEN：默认 preset、`diceSystem.enabled` 及配置/模板迁移接线完成；调整允许合法尾随逗号的源码断言后，6 项测试全部通过。

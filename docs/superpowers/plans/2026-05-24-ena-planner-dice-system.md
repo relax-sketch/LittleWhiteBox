@@ -280,7 +280,7 @@ git commit -m "Add EnaPlanner dice domain helpers"
 - Modify: `modules/ena-planner/ena-planner-presets.js`
 - Modify: `modules/ena-planner/ena-planner.js:1-329`
 
-- [ ] **Step 1: Add failing integration assertions for default/template/config wiring**
+- [x] **Step 1: Add failing integration assertions for default/template/config wiring**
 
 Append to `modules/ena-planner/tests/dice-system.test.js`:
 
@@ -294,19 +294,19 @@ test('default presets and runtime normalize the protected dice module and indepe
     assert.match(presets, /createDefaultDicePromptBlock/);
     assert.match(presets, /DEFAULT_PROMPT_BLOCKS[\s\S]*createDefaultDicePromptBlock\(\)/);
     assert.match(runtime, /normalizeDiceSystemSettings/);
-    assert.match(runtime, /diceSystem:\s*\{\s*enabled:\s*false\s*\}/);
+    assert.match(runtime, /diceSystem:\s*\{\s*enabled:\s*false,?\s*\}/);
     assert.match(runtime, /ensureDicePromptModule/);
     assert.match(runtime, /s\.promptTemplates\s*=\s*normalizePromptTemplates/);
 });
 ```
 
-- [ ] **Step 2: Run the test and verify configuration integration is absent**
+- [x] **Step 2: Run the test and verify configuration integration is absent**
 
 Run: `npm run test:ena-planner`
 
 Expected: FAIL in `default presets and runtime normalize...` because the preset/runtime sources do not import or call the dice helpers yet.
 
-- [ ] **Step 3: Include the dice block in default prompt presets**
+- [x] **Step 3: Include the dice block in default prompt presets**
 
 At the start of `modules/ena-planner/ena-planner-presets.js`, import the constructor and add the block between the default system prompt and assistant seed:
 
@@ -327,7 +327,7 @@ After the closing `},` of `ena-default-system-001`, insert:
     createDefaultDicePromptBlock(),
 ```
 
-- [ ] **Step 4: Wire persisted settings and template normalization through the protected-block helper**
+- [x] **Step 4: Wire persisted settings and template normalization through the protected-block helper**
 
 In `modules/ena-planner/ena-planner.js`, import the dice APIs:
 
@@ -381,7 +381,7 @@ In `ensureSettings()`, after defaults are merged and after existing chain normal
 
 When restoring default prompt configuration in the existing `xb-ena:reset-default-prompts` handler, retain `s.diceSystem` and use the default `promptBlocks` and `moduleChain` already containing the protected block.
 
-- [ ] **Step 5: Run focused tests and commit configuration integration**
+- [x] **Step 5: Run focused tests and commit configuration integration**
 
 Run: `npm run test:ena-planner`
 

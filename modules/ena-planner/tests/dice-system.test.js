@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import {
     DICE_PROMPT_BLOCK_ID,
@@ -80,4 +81,16 @@ test('final input appends cached dice only when planning output is unusable', ()
         'attack\n\n<dice>D20: [17]</dice>',
     );
     assert.equal(buildFinalInputWithDiceFallback('attack', '', ''), 'attack');
+});
+
+test('default presets and runtime normalize the protected dice module and independent switch', async () => {
+    const presets = await readFile(new URL('../ena-planner-presets.js', import.meta.url), 'utf8');
+    const runtime = await readFile(new URL('../ena-planner.js', import.meta.url), 'utf8');
+
+    assert.match(presets, /createDefaultDicePromptBlock/);
+    assert.match(presets, /DEFAULT_PROMPT_BLOCKS[\s\S]*createDefaultDicePromptBlock\(\)/);
+    assert.match(runtime, /normalizeDiceSystemSettings/);
+    assert.match(runtime, /diceSystem:\s*\{\s*enabled:\s*false,?\s*\}/);
+    assert.match(runtime, /ensureDicePromptModule/);
+    assert.match(runtime, /s\.promptTemplates\s*=\s*normalizePromptTemplates/);
 });

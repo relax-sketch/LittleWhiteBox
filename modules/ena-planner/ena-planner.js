@@ -7,6 +7,7 @@ import { extensionFolderPath } from '../../core/constants.js';
 import { EnaPlannerStorage } from '../../core/server-storage.js';
 import { postToIframe, isTrustedIframeEvent } from '../../core/iframe-messaging.js';
 import { DEFAULT_PROMPT_BLOCKS, BUILTIN_TEMPLATES } from './ena-planner-presets.js';
+import { ensureDicePromptModule, normalizeDiceSystemSettings } from './ena-planner-dice.js';
 import { getDefaultApiPrefix, joinApiUrl, resolveApiBaseUrl } from '../../shared/common/openai-url-utils.js';
 import { formatOutlinePrompt } from '../story-outline/story-outline.js';
 import { shouldSendOnEnter } from '../../../../../../scripts/RossAscends-mods.js';
@@ -59,6 +60,9 @@ function getDefaultSettings() {
         enabled: true,
         skipIfPlotPresent: true,
         mergeConsecutiveSystemMessages: false,
+        diceSystem: {
+            enabled: false,
+        },
 
         // Chat history: tags to strip from AI responses (besides <think>)
         chatExcludeTags: ['行动选项', 'UpdateVariable', 'StatusPlaceHolderImpl'],
@@ -210,16 +214,16 @@ function normalizePromptTemplate(rawTemplate, settingsLike = {}) {
     if (Array.isArray(rawTemplate)) {
         const legacyPromptBlocks = structuredClone(rawTemplate);
         const promptBlocks = normalizeLegacyPromptBlocks(legacyPromptBlocks);
-        return {
+        return ensureDicePromptModule(
             promptBlocks,
-            moduleChain: buildLegacyCompatibleModuleChain(legacyPromptBlocks, settingsLike),
-        };
+            buildLegacyCompatibleModuleChain(legacyPromptBlocks, settingsLike),
+        );
     }
     const promptBlocks = structuredClone(Array.isArray(rawTemplate?.promptBlocks) ? rawTemplate.promptBlocks : []);
-    return {
+    return ensureDicePromptModule(
         promptBlocks,
-        moduleChain: normalizeModuleChain(rawTemplate?.moduleChain, promptBlocks, settingsLike),
-    };
+        normalizeModuleChain(rawTemplate?.moduleChain, promptBlocks, settingsLike),
+    );
 }
 
 function normalizePromptTemplates(templates, settingsLike = {}) {
@@ -312,6 +316,10 @@ function ensureSettings() {
     } else {
         s.moduleChain = normalizeModuleChain(s.moduleChain, s.promptBlocks, s);
     }
+    s.diceSystem = normalizeDiceSystemSettings(s.diceSystem);
+    const diceNormalized = ensureDicePromptModule(s.promptBlocks, s.moduleChain);
+    s.promptBlocks = diceNormalized.promptBlocks;
+    s.moduleChain = diceNormalized.moduleChain;
     s.promptTemplates = normalizePromptTemplates(s.promptTemplates || d.promptTemplates, s);
 
     // Migration: remove old keys that are no longer needed
