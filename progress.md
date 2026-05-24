@@ -45,3 +45,7 @@
 - Task 3 GREEN：`buildPlannerMessages()` 在骰子模块位置解析一次并缓存 fallback，`runPlanningOnce()` 与正文放行路径复用缓存处理空回或 API 异常；8 项测试全部通过。
 - Task 4 RED：新增 UI 接线断言后，测试因设置页缺少独立骰子开关而失败。
 - Task 4 GREEN：设置页加入主开关、受保护可移动/可编辑骰子卡片及独立预览骰池说明；修正保存语句形式的源码断言后，9 项测试全部通过。
+- Task 5 验证：重新运行 `npm run test:ena-planner`，9 项测试全部通过；`npm run lint` 成功完成并报告 5 条不在此次改动文件中的既有 warning；`git diff --check` 通过。
+- Task 5 补充检查：通过 Node 解析 `ena-planner.html` 的内联脚本，确认脚本语法有效；复核 `callPlanner()` 确认内部兜底标记不会进入 API 请求体。
+- Task 5 边界：本会话未暴露 Browser 执行工具且无运行中的 SillyTavern 宿主页面，无法完成实际界面点击和真实发送路径联调，已在实施计划中保留为未执行项。
+- 验证期间一条只读辅助检索命令使用了 PowerShell 不支持的 `||` 而失败，未影响产品文件或已通过的验证命令。

@@ -27,6 +27,7 @@
 | --- | --- | --- |
 | 容器目录不是 Git 仓库 | 在 `d:\Github_All\stx相关` 查询 git 状态 | 转到实际项目根目录 `LittleWhiteBox` 调查。 |
 | Spec 暂存校验报告三处行尾空格 | `git diff --cached --check` | 清理日期行及默认提示词中的尾随空格后重新校验。 |
+| 辅助检索命令误用了 PowerShell 不支持的 `||` | 查看变更与页面入口时使用 shell fallback 写法 | 不影响代码或验证结果；后续改用兼容的独立命令读取状态。 |
 
 ## 已确认的产品选择
 
@@ -49,3 +50,9 @@
 - 文件：`docs/superpowers/plans/2026-05-24-ena-planner-dice-system.md`
 - 状态：用户选择 `Inline Execution`，允许在当前仓库直接实现且将工作记录纳入后续提交。
 - 执行方式：按 TDD 顺序先建立失败测试，再接入功能实现与验证。
+
+## 实施结果
+
+- 已实现：独立开关、受保护可编辑/可排序骰子块、配置与模板迁移、链内一次解析、空回及规划 API 异常/超时正文兜底。
+- 自动验证：`npm run test:ena-planner` 通过 9 项测试；`npm run lint` 退出码为 0（仅保留与本变更无关的 5 条仓库既有 warning）；`git diff --check` 无输出；iframe 内联脚本可解析。
+- 未执行：在实际 SillyTavern 宿主页中的 UI 点击、真实 API 空回/超时发送联调。本会话未提供可操作 Browser 执行表面，也未发现运行中的宿主页面。

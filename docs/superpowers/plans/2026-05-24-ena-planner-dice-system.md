@@ -663,13 +663,13 @@ git commit -m "Expose protected dice module in EnaPlanner UI"
 - Verify: `modules/ena-planner/tests/dice-system.test.js`
 - Verify: `package.json`
 
-- [ ] **Step 1: Run focused automated coverage**
+- [x] **Step 1: Run focused automated coverage**
 
 Run: `npm run test:ena-planner`
 
 Expected: PASS covering switch normalization, protected block migration, preserved edits/order, disabled rendering bypass, one-time resolved reuse, normal output, empty output, error-path wiring, and UI source integration.
 
-- [ ] **Step 2: Run repository checks for edited JavaScript and whitespace**
+- [x] **Step 2: Run repository checks for edited JavaScript and whitespace**
 
 Run: `npm run lint`
 
@@ -681,6 +681,8 @@ Expected: no output and exit code `0`.
 
 - [ ] **Step 3: Manually validate EnaPlanner settings and send paths in the available local UI**
 
+Blocked in this session: the in-app Browser execution surface is not exposed and no running SillyTavern host page was available. Automated source assertions and an inline-script parse check cover the implemented UI wiring, but live click/send-path validation remains outstanding.
+
 Validate these concrete observations:
 
 1. Basic settings displays `骰子系统` and persists `关闭`/`开启` across reopen.
@@ -690,7 +692,7 @@ Validate these concrete observations:
 5. A formal non-empty planning result injects planning only; a blank/filtered-blank planning result injects the already-resolved dice fallback.
 6. A simulated planning API throw or timeout with dice enabled releases the same cached fallback to the final send; with dice disabled it retains the existing error behavior.
 
-- [ ] **Step 4: Review final diff and commit any verification-only fixes**
+- [x] **Step 4: Review final diff and commit any verification-only fixes**
 
 Run:
 

@@ -60,3 +60,5 @@
 - 实现中的模板/配置迁移以 `ensureDicePromptModule()` 为单一约束点：旧模板缺块时插入一次，已有块的内容与位置不被默认文本覆盖，同时固定其 `system` 身份与启用标记。
 - 运行时在 `buildPlannerMessages()` 遍历骰子块时生成 `diceFallbackPrompt`，并在 `callPlanner()` 之前完成；`runPlanningOnce()` 的 API 异常恢复分支只返回该字符串，不会再次调用模板或宏渲染。
 - 设置页的骰子卡片对用户仅暴露内容编辑与上下移动操作；其名称、`system` 身份、删除/启用限制由 UI 与保存后的运行时归一化共同保证。
+- `callPlanner()` 只从运行选项读取 `onDelta`，`allowDiceFallbackOnError` 不会被序列化进 API body；规划失败兜底仅由 `runPlanningOnce()` 控制。
+- 当前会话没有可用的 Browser 执行表面或正在运行的 SillyTavern 页面；因此 live UI 和实际网络失败路径需在宿主运行环境中进一步点验。
