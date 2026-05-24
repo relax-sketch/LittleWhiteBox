@@ -1,5 +1,3 @@
-import { createDefaultDicePromptBlock } from './ena-planner-dice.js';
-
 export const DEFAULT_PROMPT_BLOCKS = [
     {
         id: 'ena-default-system-001',
@@ -45,7 +43,6 @@ export const DEFAULT_PROMPT_BLOCKS = [
 
 如有思考过程，请放在 <thinking> 中（会被自动剔除）。`,
     },
-    createDefaultDicePromptBlock(),
     {
         id: 'ena-default-assistant-001',
         role: 'assistant',

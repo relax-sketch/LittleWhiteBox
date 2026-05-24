@@ -207,7 +207,7 @@
         <div class="tip-box">
           <div class="tip-icon">💡</div>
           <div class="tip-text">
-            这里展示的模块顺序，就是发送给规划 API 的真实顺序。手写提示词块与角色卡、世界书、向量召回等上下文模块可以一起开关和排序；公平骰子系统可编辑和排序，其启用状态由基本设置控制。
+            这里展示的模块顺序，就是发送给规划 API 的真实顺序。手写提示词块与角色卡、世界书、向量召回等上下文模块可以一起开关和排序。
           </div>
         </div>
 
@@ -577,11 +577,6 @@
       previousPlots: { name: '历史 plot', role: 'system' },
       userInput: { name: '玩家输入', role: 'user' },
     };
-    const DICE_PROMPT_BLOCK_ID = 'ena-dice-system-001';
-
-    function isDicePromptBlock(block) {
-      return block?.id === DICE_PROMPT_BLOCK_ID;
-    }
 
     function moveModule(idx, delta) {
       const next = idx + delta;
@@ -614,6 +609,18 @@
       const right = document.createElement('div');
       right.className = 'prompt-head-right';
 
+      const enabledLabel = document.createElement('label');
+      enabledLabel.className = 'module-toggle';
+      const enabledInput = document.createElement('input');
+      enabledInput.type = 'checkbox';
+      enabledInput.checked = module.enabled !== false;
+      enabledInput.addEventListener('change', () => {
+        module.enabled = enabledInput.checked;
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      enabledLabel.append(enabledInput, document.createTextNode('启用'));
+
       const upBtn = document.createElement('button');
       upBtn.className = 'btn btn-sm';
       upBtn.textContent = '↑';
@@ -635,7 +642,6 @@
     function createPromptBlockElement(module, block, idx, total) {
       const wrap = document.createElement('div');
       wrap.className = 'prompt-block module-card';
-      const isDice = isDicePromptBlock(block);
 
       const head = document.createElement('div');
       head.className = 'prompt-head';
@@ -643,42 +649,32 @@
       const left = document.createElement('div');
       left.className = 'prompt-head-left';
 
-      if (isDice) {
-        const title = document.createElement('div');
-        title.className = 'module-title';
-        title.textContent = block.name || '公平骰子系统';
-        const meta = document.createElement('div');
-        meta.className = 'module-meta';
-        meta.textContent = '内置可编辑提示词 · system · 由基本设置开关控制';
-        left.append(title, meta);
-      } else {
-        const nameInput = document.createElement('input');
-        nameInput.type = 'text';
-        nameInput.className = 'input';
-        nameInput.placeholder = '块名称';
-        nameInput.value = block.name || '';
-        nameInput.addEventListener('change', () => {
-          block.name = nameInput.value;
-          scheduleSave();
-        });
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'input';
+      nameInput.placeholder = '块名称';
+      nameInput.value = block.name || '';
+      nameInput.addEventListener('change', () => {
+        block.name = nameInput.value;
+        scheduleSave();
+      });
 
-        const roleSelect = document.createElement('select');
-        roleSelect.className = 'input';
-        ['system', 'user', 'assistant'].forEach(r => {
-          const opt = document.createElement('option');
-          opt.value = r;
-          opt.textContent = r;
-          opt.selected = (block.role || 'system') === r;
-          roleSelect.appendChild(opt);
-        });
-        roleSelect.addEventListener('change', () => {
-          block.role = roleSelect.value;
-          scheduleSave();
-          schedulePreviewRefresh();
-        });
+      const roleSelect = document.createElement('select');
+      roleSelect.className = 'input';
+      ['system', 'user', 'assistant'].forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        opt.selected = (block.role || 'system') === r;
+        roleSelect.appendChild(opt);
+      });
+      roleSelect.addEventListener('change', () => {
+        block.role = roleSelect.value;
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
 
-        left.append(nameInput, roleSelect);
-      }
+      left.append(nameInput, roleSelect);
 
       const right = document.createElement('div');
       right.className = 'prompt-head-right';
@@ -707,32 +703,18 @@
       downBtn.disabled = idx === total - 1;
       downBtn.addEventListener('click', () => moveModule(idx, 1));
 
-      if (isDice) right.append(upBtn, downBtn);
-      else {
-        const enabledLabel = document.createElement('label');
-        enabledLabel.className = 'module-toggle';
-        const enabledInput = document.createElement('input');
-        enabledInput.type = 'checkbox';
-        enabledInput.checked = module.enabled !== false;
-        enabledInput.addEventListener('change', () => {
-          module.enabled = enabledInput.checked;
-          scheduleSave();
-          schedulePreviewRefresh();
-        });
-        enabledLabel.append(enabledInput, document.createTextNode('启用'));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-sm btn-del';
+      delBtn.textContent = '删除';
+      delBtn.addEventListener('click', () => {
+        cfg.promptBlocks = (cfg.promptBlocks || []).filter(item => item.id !== block.id);
+        cfg.moduleChain = (cfg.moduleChain || []).filter(item => !(item.kind === 'promptBlock' && item.blockId === block.id));
+        renderPromptList();
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
 
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn btn-sm btn-del';
-        delBtn.textContent = '删除';
-        delBtn.addEventListener('click', () => {
-          cfg.promptBlocks = (cfg.promptBlocks || []).filter(item => item.id !== block.id);
-          cfg.moduleChain = (cfg.moduleChain || []).filter(item => !(item.kind === 'promptBlock' && item.blockId === block.id));
-          renderPromptList();
-          scheduleSave();
-          schedulePreviewRefresh();
-        });
-        right.append(enabledLabel, upBtn, downBtn, delBtn);
-      }
+      right.append(enabledLabel, upBtn, downBtn, delBtn);
 
       const content = document.createElement('textarea');
       content.className = 'input';
