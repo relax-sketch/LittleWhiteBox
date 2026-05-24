@@ -3,7 +3,10 @@ const EMPTY_DICE_TURN_CONTEXT = Object.freeze({
     fallbackPrompt: '',
 });
 
-const DICE_RULE_CORE_TEMPLATE = `<合理性审查>
+export const DICE_PROMPT_BLOCK_ID = 'ena-dice-system-001';
+export const DICE_PROMPT_BLOCK_NAME = '公平骰子系统';
+
+export const DEFAULT_DICE_PROMPT_CONTENT = `<合理性审查>
 核心原则:
 - 创作目标是建立细腻且符合因果逻辑的世界观。
 - 裁定必须公平，不可迁就玩家声明的期望结果。
@@ -45,17 +48,65 @@ D4: [{{roll 1d4}}, {{roll 1d4}}, {{roll 1d4}}, {{roll 1d4}}, {{roll 1d4}}, {{rol
 D100: [{{roll 1d100}}, {{roll 1d100}}, {{roll 1d100}}, {{roll 1d100}}, {{roll 1d100}}]
 </骰子池>`;
 
+export function createDefaultDicePromptBlock() {
+    return {
+        id: DICE_PROMPT_BLOCK_ID,
+        role: 'system',
+        name: DICE_PROMPT_BLOCK_NAME,
+        content: DEFAULT_DICE_PROMPT_CONTENT,
+    };
+}
+
+export function ensureDicePromptModule(promptBlocks, moduleChain) {
+    const blocks = [];
+    let hasDiceBlock = false;
+    for (const block of Array.isArray(promptBlocks) ? promptBlocks : []) {
+        if (block?.id !== DICE_PROMPT_BLOCK_ID) {
+            blocks.push(block);
+            continue;
+        }
+        if (hasDiceBlock) continue;
+        blocks.push({
+            ...block,
+            role: 'system',
+            name: DICE_PROMPT_BLOCK_NAME,
+        });
+        hasDiceBlock = true;
+    }
+    if (!hasDiceBlock) blocks.push(createDefaultDicePromptBlock());
+
+    const chain = [];
+    let hasDiceModule = false;
+    for (const module of Array.isArray(moduleChain) ? moduleChain : []) {
+        if (module?.kind !== 'promptBlock' || module.blockId !== DICE_PROMPT_BLOCK_ID) {
+            chain.push(module);
+            continue;
+        }
+        if (hasDiceModule) continue;
+        chain.push({ ...module, enabled: true });
+        hasDiceModule = true;
+    }
+    if (!hasDiceModule) {
+        const firstBuiltinIndex = chain.findIndex(module => module?.kind === 'builtin');
+        const insertAt = firstBuiltinIndex >= 0 ? firstBuiltinIndex : chain.length;
+        chain.splice(insertAt, 0, { kind: 'promptBlock', blockId: DICE_PROMPT_BLOCK_ID, enabled: true });
+    }
+
+    return { promptBlocks: blocks, moduleChain: chain };
+}
+
 export function normalizeDiceSystemSettings(rawSettings) {
     return {
         enabled: rawSettings?.enabled === true,
     };
 }
 
-export async function buildDiceTurnContext(rawSettings, renderMacroText) {
+export async function buildDiceTurnContext(rawSettings, promptContent, renderMacroText) {
     const settings = normalizeDiceSystemSettings(rawSettings);
-    if (!settings.enabled) return { ...EMPTY_DICE_TURN_CONTEXT };
+    const source = String(promptContent ?? '');
+    if (!settings.enabled || !source.trim()) return { ...EMPTY_DICE_TURN_CONTEXT };
 
-    const resolvedRules = String(await renderMacroText(DICE_RULE_CORE_TEMPLATE));
+    const resolvedRules = String(await renderMacroText(source));
     return {
         plannerPrompt: `<ena_dice_system mode="planner">
 你是剧情规划器。先依据下方合理性审查与本轮固定骰池裁定玩家行动，再将裁定后的发展写入规划输出。需要检定时，应在规划中明确实际骰点、修正/难度和成功或失败后果，使正文模型能够忠实执行；不要重新掷骰。

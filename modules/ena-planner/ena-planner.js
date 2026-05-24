@@ -7,7 +7,13 @@ import { extensionFolderPath } from '../../core/constants.js';
 import { EnaPlannerStorage } from '../../core/server-storage.js';
 import { postToIframe, isTrustedIframeEvent } from '../../core/iframe-messaging.js';
 import { DEFAULT_PROMPT_BLOCKS, BUILTIN_TEMPLATES } from './ena-planner-presets.js';
-import { buildDiceTurnContext, buildFinalInputWithDiceFallback, normalizeDiceSystemSettings } from './ena-planner-dice.js';
+import {
+    DICE_PROMPT_BLOCK_ID,
+    buildDiceTurnContext,
+    buildFinalInputWithDiceFallback,
+    ensureDicePromptModule,
+    normalizeDiceSystemSettings,
+} from './ena-planner-dice.js';
 import { getDefaultApiPrefix, joinApiUrl, resolveApiBaseUrl } from '../../shared/common/openai-url-utils.js';
 import { formatOutlinePrompt } from '../story-outline/story-outline.js';
 import { shouldSendOnEnter } from '../../../../../../scripts/RossAscends-mods.js';
@@ -211,19 +217,17 @@ function normalizeModuleChain(chain, promptBlocks = [], settingsLike = {}) {
 }
 
 function normalizePromptTemplate(rawTemplate, settingsLike = {}) {
+    let promptBlocks;
+    let moduleChain;
     if (Array.isArray(rawTemplate)) {
         const legacyPromptBlocks = structuredClone(rawTemplate);
-        const promptBlocks = normalizeLegacyPromptBlocks(legacyPromptBlocks);
-        return {
-            promptBlocks,
-            moduleChain: buildLegacyCompatibleModuleChain(legacyPromptBlocks, settingsLike),
-        };
+        promptBlocks = normalizeLegacyPromptBlocks(legacyPromptBlocks);
+        moduleChain = buildLegacyCompatibleModuleChain(legacyPromptBlocks, settingsLike);
+    } else {
+        promptBlocks = structuredClone(Array.isArray(rawTemplate?.promptBlocks) ? rawTemplate.promptBlocks : []);
+        moduleChain = normalizeModuleChain(rawTemplate?.moduleChain, promptBlocks, settingsLike);
     }
-    const promptBlocks = structuredClone(Array.isArray(rawTemplate?.promptBlocks) ? rawTemplate.promptBlocks : []);
-    return {
-        promptBlocks,
-        moduleChain: normalizeModuleChain(rawTemplate?.moduleChain, promptBlocks, settingsLike),
-    };
+    return ensureDicePromptModule(promptBlocks, moduleChain);
 }
 
 function normalizePromptTemplates(templates, settingsLike = {}) {
@@ -317,6 +321,7 @@ function ensureSettings() {
     } else {
         s.moduleChain = normalizeModuleChain(s.moduleChain, s.promptBlocks, s);
     }
+    ({ promptBlocks: s.promptBlocks, moduleChain: s.moduleChain } = ensureDicePromptModule(s.promptBlocks, s.moduleChain));
     s.promptTemplates = normalizePromptTemplates(s.promptTemplates || d.promptTemplates, s);
 
     // Migration: remove old keys that are no longer needed
@@ -1624,10 +1629,6 @@ async function buildPlannerMessages(rawUserInput) {
     const charObj = getCurrentCharSafe();
     const env = await prepareEjsEnv();
     const messageVars = getLatestMessageVarTable();
-    const diceTurnContext = await buildDiceTurnContext(
-        s.diceSystem,
-        text => renderTemplateAll(text, env, messageVars),
-    );
 
     const enabledBuiltins = new Set((s.moduleChain || [])
         .filter(item => item?.kind === 'builtin' && item.enabled !== false)
@@ -1745,9 +1746,7 @@ async function buildPlannerMessages(rawUserInput) {
     };
     const promptBlockMap = new Map((s.promptBlocks || []).map(block => [block.id, block]));
     const messages = [];
-    if (diceTurnContext.plannerPrompt) {
-        messages.push({ role: 'system', content: diceTurnContext.plannerPrompt });
-    }
+    let diceFallbackPrompt = '';
     for (const module of s.moduleChain || []) {
         if (module?.enabled === false) continue;
         if (module?.kind === 'builtin') {
@@ -1758,6 +1757,18 @@ async function buildPlannerMessages(rawUserInput) {
         if (module?.kind === 'promptBlock' && enabledPromptBlocks.has(module.blockId)) {
             const block = promptBlockMap.get(module.blockId);
             if (!block || !String(block?.content ?? '').trim()) continue;
+            if (block.id === DICE_PROMPT_BLOCK_ID) {
+                const diceTurnContext = await buildDiceTurnContext(
+                    s.diceSystem,
+                    block.content,
+                    text => renderTemplateAll(text, env, messageVars),
+                );
+                diceFallbackPrompt = diceTurnContext.fallbackPrompt;
+                if (diceTurnContext.plannerPrompt) {
+                    messages.push({ role: 'system', content: diceTurnContext.plannerPrompt });
+                }
+                continue;
+            }
             const content = await renderTemplateAll(block.content, env, messageVars);
             if (!String(content).trim()) continue;
             messages.push({ role: block.role || 'system', content });
@@ -1778,7 +1789,7 @@ async function buildPlannerMessages(rawUserInput) {
             westWorldDirectorRaw,
             westWorldDirectorMeta,
             westWorldDirectorError,
-            diceFallbackPrompt: diceTurnContext.fallbackPrompt,
+            diceFallbackPrompt,
             cachedSummaryLen: cachedSummary.length,
             plotsRaw,
         },
