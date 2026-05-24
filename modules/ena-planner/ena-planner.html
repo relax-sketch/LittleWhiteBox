@@ -81,8 +81,15 @@
                 <option value="true">开启</option>
               </select>
             </div>
+            <div class="form-group">
+              <label class="form-label">骰子系统</label>
+              <select id="ep_dice_system_enabled" class="input">
+                <option value="false">关闭</option>
+                <option value="true">开启</option>
+              </select>
+            </div>
           </div>
-          <p class="form-hint">输入中已有 &lt;plot&gt; 标签时跳过自动规划。开启“合并连续 system”后，会把相邻的 system 消息折叠为一条，不跨过 user / assistant。</p>
+          <p class="form-hint">输入中已有 &lt;plot&gt; 标签时跳过自动规划。开启“合并连续 system”后，会把相邻的 system 消息折叠为一条，不跨过 user / assistant。开启骰子系统后，规划为空或失败时正文会复用本轮同一骰池。</p>
         </section>
 
         <section class="card">
@@ -241,6 +248,7 @@
             <label class="form-label">预览输入（留空则读取当前输入框，仍为空时使用默认文本）</label>
             <textarea id="ep_preview_input" class="input" rows="3" placeholder="输入一段测试文本，用当前模块链组装真实请求..."></textarea>
           </div>
+          <p class="form-hint">骰子系统开启时，预览与规划测试会生成独立骰池，仅用于本次检查，不是随后正式发送使用的骰池。</p>
           <div class="btn-group" style="margin-bottom:16px;">
             <button id="ep_refresh_preview" class="btn btn-p">刷新真实发送预览</button>
           </div>
@@ -569,6 +577,11 @@
       previousPlots: { name: '历史 plot', role: 'system' },
       userInput: { name: '玩家输入', role: 'user' },
     };
+    const DICE_PROMPT_BLOCK_ID = 'ena-dice-system-001';
+
+    function isDicePromptBlock(block) {
+      return block?.id === DICE_PROMPT_BLOCK_ID;
+    }
 
     function moveModule(idx, delta) {
       const next = idx + delta;
@@ -634,6 +647,7 @@
     function createPromptBlockElement(module, block, idx, total) {
       const wrap = document.createElement('div');
       wrap.className = 'prompt-block module-card';
+      const protectedDice = isDicePromptBlock(block);
 
       const head = document.createElement('div');
       head.className = 'prompt-head';
@@ -641,32 +655,41 @@
       const left = document.createElement('div');
       left.className = 'prompt-head-left';
 
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.className = 'input';
-      nameInput.placeholder = '块名称';
-      nameInput.value = block.name || '';
-      nameInput.addEventListener('change', () => {
-        block.name = nameInput.value;
-        scheduleSave();
-      });
+      if (protectedDice) {
+        const title = document.createElement('div');
+        title.className = 'module-title';
+        title.textContent = block.name || '公平骰子规则';
+        const meta = document.createElement('div');
+        meta.className = 'module-meta';
+        meta.textContent = '受保护的 system 模块；是否生效由基本设置中的骰子系统开关控制。';
+        left.append(title, meta);
+      } else {
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'input';
+        nameInput.placeholder = '块名称';
+        nameInput.value = block.name || '';
+        nameInput.addEventListener('change', () => {
+          block.name = nameInput.value;
+          scheduleSave();
+        });
 
-      const roleSelect = document.createElement('select');
-      roleSelect.className = 'input';
-      ['system', 'user', 'assistant'].forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r;
-        opt.textContent = r;
-        opt.selected = (block.role || 'system') === r;
-        roleSelect.appendChild(opt);
-      });
-      roleSelect.addEventListener('change', () => {
-        block.role = roleSelect.value;
-        scheduleSave();
-        schedulePreviewRefresh();
-      });
-
-      left.append(nameInput, roleSelect);
+        const roleSelect = document.createElement('select');
+        roleSelect.className = 'input';
+        ['system', 'user', 'assistant'].forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r;
+          opt.textContent = r;
+          opt.selected = (block.role || 'system') === r;
+          roleSelect.appendChild(opt);
+        });
+        roleSelect.addEventListener('change', () => {
+          block.role = roleSelect.value;
+          scheduleSave();
+          schedulePreviewRefresh();
+        });
+        left.append(nameInput, roleSelect);
+      }
 
       const right = document.createElement('div');
       right.className = 'prompt-head-right';
@@ -706,7 +729,9 @@
         schedulePreviewRefresh();
       });
 
-      right.append(enabledLabel, upBtn, downBtn, delBtn);
+      if (!protectedDice) right.append(enabledLabel);
+      right.append(upBtn, downBtn);
+      if (!protectedDice) right.append(delBtn);
 
       const content = document.createElement('textarea');
       content.className = 'input';
@@ -932,6 +957,7 @@
       $('ep_enabled').value = String(toBool(cfg.enabled, true));
       $('ep_skip_plot').value = String(toBool(cfg.skipIfPlotPresent, true));
       $('ep_merge_system_msgs').value = String(toBool(cfg.mergeConsecutiveSystemMessages, false));
+      $('ep_dice_system_enabled').value = String(toBool(cfg.diceSystem?.enabled, false));
 
       const api = cfg.api || {};
       $('ep_api_channel').value = api.channel || 'openai';
@@ -978,6 +1004,9 @@
       p.enabled = toBool($('ep_enabled').value, true);
       p.skipIfPlotPresent = toBool($('ep_skip_plot').value, true);
       p.mergeConsecutiveSystemMessages = toBool($('ep_merge_system_msgs').value, false);
+      p.diceSystem = {
+        enabled: toBool($('ep_dice_system_enabled').value, false),
+      };
 
       p.api = {
         channel: $('ep_api_channel').value,

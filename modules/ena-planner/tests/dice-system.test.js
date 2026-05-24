@@ -123,3 +123,13 @@ test('an unavailable planner output reuses its previously resolved pool without 
     assert.match(releasedInput, /D20: \[4\]/);
     assert.doesNotMatch(releasedInput, /{{roll:/);
 });
+
+test('settings UI exposes the master switch and protects the dice prompt editor', async () => {
+    const html = await readFile(new URL('../ena-planner.html', import.meta.url), 'utf8');
+    assert.match(html, /id="ep_dice_system_enabled"/);
+    assert.match(html, /DICE_PROMPT_BLOCK_ID\s*=\s*'ena-dice-system-001'/);
+    assert.match(html, /isDicePromptBlock/);
+    assert.match(html, /由基本设置中的骰子系统开关控制/);
+    assert.match(html, /p\.diceSystem\s*=\s*\{\s*enabled:/);
+    assert.match(html, /预览.*生成独立骰池/);
+});

@@ -43,3 +43,5 @@
 - Task 2 GREEN：默认 preset、`diceSystem.enabled` 及配置/模板迁移接线完成；调整允许合法尾随逗号的源码断言后，6 项测试全部通过。
 - Task 3 RED：新增运行时顺序/错误兜底接线测试后，测试因链遍历尚未构造骰子上下文而失败。
 - Task 3 GREEN：`buildPlannerMessages()` 在骰子模块位置解析一次并缓存 fallback，`runPlanningOnce()` 与正文放行路径复用缓存处理空回或 API 异常；8 项测试全部通过。
+- Task 4 RED：新增 UI 接线断言后，测试因设置页缺少独立骰子开关而失败。
+- Task 4 GREEN：设置页加入主开关、受保护可移动/可编辑骰子卡片及独立预览骰池说明；修正保存语句形式的源码断言后，9 项测试全部通过。

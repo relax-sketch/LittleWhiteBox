@@ -555,7 +555,7 @@ git commit -m "Reuse resolved dice for planner fallback"
 - Modify: `modules/ena-planner/tests/dice-system.test.js`
 - Modify: `modules/ena-planner/ena-planner.html:60-1298`
 
-- [ ] **Step 1: Add failing UI source assertions**
+- [x] **Step 1: Add failing UI source assertions**
 
 Append to `modules/ena-planner/tests/dice-system.test.js`:
 
@@ -566,18 +566,18 @@ test('settings UI exposes the master switch and protects the dice prompt editor'
     assert.match(html, /DICE_PROMPT_BLOCK_ID\s*=\s*'ena-dice-system-001'/);
     assert.match(html, /isDicePromptBlock/);
     assert.match(html, /由基本设置中的骰子系统开关控制/);
-    assert.match(html, /diceSystem:\s*\{\s*enabled:/);
+    assert.match(html, /p\.diceSystem\s*=\s*\{\s*enabled:/);
     assert.match(html, /预览.*生成独立骰池/);
 });
 ```
 
-- [ ] **Step 2: Run tests and establish that UI controls are missing**
+- [x] **Step 2: Run tests and establish that UI controls are missing**
 
 Run: `npm run test:ena-planner`
 
 Expected: FAIL in `settings UI exposes...` due to absent switch/protected-card behavior.
 
-- [ ] **Step 3: Add the independent switch and preview explanation**
+- [x] **Step 3: Add the independent switch and preview explanation**
 
 Add a new basic settings field in `modules/ena-planner/ena-planner.html`, adjacent to the other master fields:
 
@@ -598,7 +598,7 @@ Under the existing true-send preview text, add:
           <div class="muted">骰子系统开启时，预览或测试会生成独立骰池，仅用于本次检查，不是随后正式发送使用的骰池。</div>
 ```
 
-- [ ] **Step 4: Render a protected editable card and persist only the master switch plus existing block/template structures**
+- [x] **Step 4: Render a protected editable card and persist only the master switch plus existing block/template structures**
 
 In the iframe script, declare the fixed ID beside `BUILTIN_MODULES`:
 
@@ -640,7 +640,7 @@ In `collectPatch()`, save only global activation on its own field, while existin
       };
 ```
 
-- [ ] **Step 5: Run focused tests and commit UI/persistence integration**
+- [x] **Step 5: Run focused tests and commit UI/persistence integration**
 
 Run: `npm run test:ena-planner`
 
