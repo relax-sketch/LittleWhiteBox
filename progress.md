@@ -1,0 +1,41 @@
+# 工作进度
+
+## 2026-05-24
+
+- 启动 `superpowers:brainstorming`：本轮仅调查并形成设计，等待确认后才允许进入实现。
+- 启动 `planning-with-files`：在项目根目录记录阶段、发现和进度。
+- 定位仓库为 `LittleWhiteBox`，发现当前 HEAD 已回退此前两次骰子功能尝试。
+- 初步定位 `settings.html` / `index.js` 的模块开关和 `ena-planner.html` 的统一模块链、模板保存 UI。
+- 已核对 `ena-planner.js`：细项配置由 `EnaPlannerStorage` 保存，规划消息由 `buildPlannerMessages()` 按链构造，正文发送在 `doInterceptAndPlanThenSend()` 写回输入触发。
+- 已查看回退补丁方向：第二版尝试专用可编辑骰子块和空回复用；后续需审查其边界问题而非照搬。
+- 已核对全发送路径、配置持久化和预览构造；确认骰子解析必须在单轮消息构造时完成并将解析结果交给发送兜底。
+- 识别到宏语法待验证：历史补丁与用户文本的 `roll` 形式不同。
+- 已确认默认 SillyTavern 宏引擎同时识别 `{{roll:1d20}}` 和空格形式，默认内容应使用用户给出的单冒号形式。
+- 实验宏引擎存在独立 `roll` 注册且默认关闭，仍需确认用户单冒号形式的兼容性。
+- 确认当前没有 EnaPlanner 专属测试，应在实现方案内补充逻辑级回归验证。
+- 已从 `MacroParser` 确认实验引擎同样允许 `{{roll:1d20}}`；用户给出的宏可作为默认文本基线。
+- 调查阶段完成；本轮没有修改功能代码，仅新增调查记录文件。
+- 下一步：确认默认提示词范围后提出实现方案与设计。
+- 用户确认默认骰子模块采用其提供的规则文本，并选择“受保护链内模块 + 单一总开关”模式。
+- 用户确认空回时可将同轮已解析骰子规则作为附加指令随原输入发送给正文模型。
+- 澄清阶段完成；下一步向用户提供候选接入路径与推荐设计。
+- 已向用户比较三种方案，用户确认采用专用受保护提示词块方案及其配置/模板迁移设计。
+- 下一步：确认运行时数据流和异常处理设计。
+- 用户否决“规划 API 失败则停止”的原策略，要求 API 抛错/超时在已有解析骰池时也转入正文兜底。
+- 已确认调用顺序保证规划 API 执行前已解析骰子模块，规划 API 失败路径可直接复用同轮骰池。
+- 将失败范围界定为规划阶段；正文请求放行后的失败不自动重发，避免重复生成。
+- 下一步：向用户呈现修订后的完整运行时和验证设计以取得确认。
+- 用户批准完整设计。
+- 已创建设计规范 `docs/superpowers/specs/2026-05-24-ena-planner-dice-system-design.md`，内容覆盖默认提示词、配置/模板迁移、运行时复用、异常兜底及验证范围。
+- 已执行 spec 自查并修正两处歧义：编辑区只保存用户规则内容，运行时包装由代码生成；新增测试需要固定的 `package.json` 运行入口。
+- `git diff --cached --check` 首次发现 spec 三处行尾空格；已清理，将重新暂存校验。
+- 重新运行 `git diff --cached --check` 已通过。
+- 已仅提交正式设计文档：`f9c2810 Document EnaPlanner dice system design`。
+- 下一步：等待用户审阅设计规范；确认后进入实施计划阶段。
+- 用户已审阅并批准设计规范，现启动 `superpowers:writing-plans` 与测试先行的实施计划整理。
+- 已写入 `docs/superpowers/plans/2026-05-24-ena-planner-dice-system.md`，覆盖纯逻辑、配置/模板、运行时兜底、设置 UI 与交付验证五个任务。
+- 已执行计划自查：未发现占位步骤或空白错误，且关键异常兜底包含“同一已解析骰池不二次渲染”的测试步骤。
+- 用户选择 `Inline Execution`，明确无需 worktree，且要求将 `task_plan.md`、`findings.md`、`progress.md` 纳入后续提交。
+- 已启动 `superpowers:executing-plans` 与 `superpowers:test-driven-development`，首先编写骰子领域辅助逻辑的失败测试。
+- Task 1 RED：`node --test modules/ena-planner/tests/dice-system.test.js` 因预期缺少 `ena-planner-dice.js` 而以 `ERR_MODULE_NOT_FOUND` 失败。
+- Task 1 GREEN：新增骰子纯逻辑模块与 `test:ena-planner` 入口后，`npm run test:ena-planner` 的 5 项测试全部通过。

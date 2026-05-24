@@ -26,7 +26,7 @@
 - Create: `modules/ena-planner/ena-planner-dice.js`
 - Modify: `package.json`
 
-- [ ] **Step 1: Write failing tests for settings, protected-module migration, single resolution, and fallback composition**
+- [x] **Step 1: Write failing tests for settings, protected-module migration, single resolution, and fallback composition**
 
 Create `modules/ena-planner/tests/dice-system.test.js` with these initial behavior tests:
 
@@ -116,13 +116,13 @@ test('final input appends cached dice only when planning output is unusable', ()
 });
 ```
 
-- [ ] **Step 2: Run the focused test to prove the new module does not yet exist**
+- [x] **Step 2: Run the focused test to prove the new module does not yet exist**
 
 Run: `node --test modules/ena-planner/tests/dice-system.test.js`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `../ena-planner-dice.js`.
 
-- [ ] **Step 3: Implement the pure dice helper with the approved default content and cached wrappers**
+- [x] **Step 3: Implement the pure dice helper with the approved default content and cached wrappers**
 
 Create `modules/ena-planner/ena-planner-dice.js`:
 
@@ -252,7 +252,7 @@ export function buildFinalInputWithDiceFallback(rawUserInput, filteredPlanning, 
 }
 ```
 
-- [ ] **Step 4: Register the focused test command**
+- [x] **Step 4: Register the focused test command**
 
 Add this property within `package.json`'s existing `"scripts"` object:
 
@@ -260,7 +260,7 @@ Add this property within `package.json`'s existing `"scripts"` object:
 "test:ena-planner": "node --test modules/ena-planner/tests/dice-system.test.js"
 ```
 
-- [ ] **Step 5: Run unit tests and commit the pure behavior**
+- [x] **Step 5: Run unit tests and commit the pure behavior**
 
 Run: `npm run test:ena-planner`
 
