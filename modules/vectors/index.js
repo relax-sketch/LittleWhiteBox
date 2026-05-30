@@ -41,7 +41,7 @@ import {
   getStringHash,
   onlyUnique,
   waitUntilCondition,
-} from '../../../utils.js';
+} from '../../../../../utils.js';
 import { getSortedEntries, saveWorldInfo, loadWorldInfo } from '../../../../../world-info.js';
 import { shouldSkipContent } from './src/utils/contentFilter.js';
 import { extractTagContent, extractSimpleTag, extractComplexTag, extractHtmlFormatTag } from './src/utils/tagExtractor.js';
@@ -4621,4 +4621,3 @@ async function toggleMessageRangeVisibility(startIndex, endIndex, hide) {
     toastr.error('操作失败');
   }
 }
-
