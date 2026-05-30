@@ -3,8 +3,16 @@ import { saveSettingsDebounced, eventSource, event_types, getRequestHeaders } fr
 import { EXT_ID, extensionFolderPath } from "./core/constants.js";
 import { executeSlashCommand } from "./core/slash-command.js";
 import { EventCenter } from "./core/event-manager.js";
+import { initTasks } from "./modules/scheduled-tasks/scheduled-tasks.js";
+import { initMessagePreview, addHistoryButtonsDebounced } from "./modules/message-preview.js";
+import { initImmersiveMode } from "./modules/immersive-mode.js";
+import { initTemplateEditor } from "./modules/template-editor/template-editor.js";
+import { initFourthWall, fourthWallCleanup } from "./modules/fourth-wall/fourth-wall.js";
 import { initButtonCollapse } from "./widgets/button-collapse.js";
+import { initVariablesPanel, cleanupVariablesPanel } from "./modules/variables/variables-panel.js";
 import { initStreamingGeneration } from "./modules/streaming-generation.js";
+import { initVariablesCore, cleanupVariablesCore } from "./modules/variables/variables-core.js";
+import { initControlAudio } from "./modules/control-audio.js";
 import {
     initRenderer,
     cleanupRenderer,
@@ -14,19 +22,32 @@ import {
     shrinkRenderedWindowFull
 } from "./modules/iframe-renderer.js";
 import { initVarCommands, cleanupVarCommands } from "./modules/variables/var-commands.js";
+import { initVareventEditor, cleanupVareventEditor } from "./modules/variables/varevent-editor.js";
+import { initNovelDraw, cleanupNovelDraw } from "./modules/novel-draw/novel-draw.js";
 import "./modules/story-summary/story-summary.js";
 import "./modules/story-outline/story-outline.js";
+import { initTts, cleanupTts } from "./modules/tts/tts.js";
 import { initEnaPlanner, cleanupEnaPlanner } from "./modules/ena-planner/ena-planner.js";
-import { initVectors, cleanupVectors } from "./modules/vectors/index.js";
-import { initDirector, cleanupDirector } from "./modules/director/index.js";
+import { initAssistant, cleanupAssistant } from "./modules/assistant/assistant.js";
 
 extension_settings[EXT_ID] = extension_settings[EXT_ID] || {
     enabled: true,
+    recorded: { enabled: true },
+    templateEditor: { enabled: true, characterBindings: {} },
+    tasks: { enabled: true, globalTasks: [], processedMessages: [], character_allowed_tasks: [] },
+    preview: { enabled: false },
+    immersive: { enabled: false },
+    fourthWall: { enabled: false },
+    audio: { enabled: true },
+    variablesPanel: { enabled: false },
+    variablesCore: { enabled: true },
+    variablesMode: '1.0',
     storySummary: { enabled: true },
     storyOutline: { enabled: false },
+    novelDraw: { enabled: false },
+    tts: { enabled: false },
     enaPlanner: { enabled: false },
-    vectors: { enabled: true },
-    director: { enabled: true },
+    assistant: { enabled: false },
     useBlob: false,
     wrapperIframe: true,
     renderEnabled: true,
@@ -34,8 +55,7 @@ extension_settings[EXT_ID] = extension_settings[EXT_ID] || {
 };
 
 const settings = extension_settings[EXT_ID];
-settings.vectors ||= { enabled: true };
-settings.director ||= { enabled: true };
+if (settings.dynamicPrompt && !settings.fourthWall) settings.fourthWall = settings.dynamicPrompt;
 
 const DEPRECATED_KEYS = [
     'characterUpdater',
@@ -253,10 +273,15 @@ async function waitForElement(selector, root = document, timeout = 10000) {
 
 function toggleSettingsControls(enabled) {
     const controls = [
-        'xiaobaix_use_blob', 'Wrapperiframe', 'xiaobaix_render_enabled',
+        'xiaobaix_recorded_enabled', 'xiaobaix_preview_enabled',
+        'scheduled_tasks_enabled', 'xiaobaix_template_enabled',
+        'xiaobaix_immersive_enabled', 'xiaobaix_fourth_wall_enabled',
+        'xiaobaix_audio_enabled', 'xiaobaix_variables_panel_enabled',
+        'xiaobaix_use_blob', 'xiaobaix_variables_core_enabled', 'xiaobaix_variables_mode', 'Wrapperiframe', 'xiaobaix_render_enabled',
         'xiaobaix_max_rendered', 'xiaobaix_story_outline_enabled', 'xiaobaix_story_summary_enabled',
-        'xiaobaix_ena_planner_enabled', 'xiaobaix_ena_planner_open_settings',
-        'xiaobaix_ena_planner_open_settings_secondary', 'xiaobaix_vectors_enabled', 'xiaobaix_director_enabled'
+        'xiaobaix_novel_draw_enabled', 'xiaobaix_novel_draw_open_settings',
+        'xiaobaix_tts_enabled', 'xiaobaix_tts_open_settings',
+        'xiaobaix_ena_planner_enabled', 'xiaobaix_ena_planner_open_settings'
     ];
     controls.forEach(id => {
         $(`#${id}`).prop('disabled', !enabled).closest('.flex-container').toggleClass('disabled-control', !enabled);
@@ -275,8 +300,7 @@ function toggleSettingsControls(enabled) {
 
 function syncFeatureActionButtons() {
     const bindings = [
-        { toggleId: 'xiaobaix_ena_planner_enabled', buttonId: 'xiaobaix_ena_planner_open_settings' },
-        { toggleId: 'xiaobaix_ena_planner_enabled', buttonId: 'xiaobaix_ena_planner_open_settings_secondary' }
+        { toggleId: 'xiaobaix_ena_planner_enabled', buttonId: 'xiaobaix_ena_planner_open_settings' }
     ];
     bindings.forEach(({ toggleId, buttonId }) => {
         const toggle = document.getElementById(toggleId);
@@ -286,6 +310,11 @@ function syncFeatureActionButtons() {
         button.disabled = !enabled;
         button.classList.toggle('disabled-action', !enabled);
     });
+    const assistantButton = document.getElementById('xiaobaix_assistant_open_settings');
+    if (assistantButton) {
+        assistantButton.disabled = !isXiaobaixEnabled;
+        assistantButton.classList.toggle('disabled-action', !isXiaobaixEnabled);
+    }
 }
 
 async function toggleAllFeatures(enabled) {
@@ -295,9 +324,19 @@ async function toggleAllFeatures(enabled) {
         saveSettingsDebounced();
         initRenderer();
         try { initVarCommands(); } catch (e) { }
+        try { initVareventEditor(); } catch (e) { }
+        if (extension_settings[EXT_ID].tasks?.enabled) {
+            await initTasks();
+        }
         const moduleInits = [
-            { condition: extension_settings[EXT_ID].vectors?.enabled, init: initVectors },
-            { condition: extension_settings[EXT_ID].director?.enabled, init: initDirector },
+            { condition: extension_settings[EXT_ID].immersive?.enabled, init: initImmersiveMode },
+            { condition: extension_settings[EXT_ID].templateEditor?.enabled, init: initTemplateEditor },
+            { condition: extension_settings[EXT_ID].fourthWall?.enabled, init: initFourthWall },
+            { condition: extension_settings[EXT_ID].audio?.enabled, init: initControlAudio },
+            { condition: extension_settings[EXT_ID].variablesPanel?.enabled, init: initVariablesPanel },
+            { condition: extension_settings[EXT_ID].variablesCore?.enabled, init: initVariablesCore },
+            { condition: extension_settings[EXT_ID].novelDraw?.enabled, init: initNovelDraw },
+            { condition: extension_settings[EXT_ID].tts?.enabled, init: initTts },
             { condition: extension_settings[EXT_ID].enaPlanner?.enabled, init: initEnaPlanner },
             { condition: true, init: initStreamingGeneration },
             { condition: true, init: initButtonCollapse }
@@ -305,6 +344,13 @@ async function toggleAllFeatures(enabled) {
         moduleInits.forEach(({ condition, init }) => {
             if (condition) init();
         });
+        if (extension_settings[EXT_ID].preview?.enabled || extension_settings[EXT_ID].recorded?.enabled) {
+            setTimeout(initMessagePreview, 200);
+        }
+        if (extension_settings[EXT_ID].preview?.enabled)
+            setTimeout(() => { document.querySelectorAll('#message_preview_btn').forEach(btn => btn.style.display = ''); }, 500);
+        if (extension_settings[EXT_ID].recorded?.enabled)
+            setTimeout(() => addHistoryButtonsDebounced(), 600);
         try {
             if (isXiaobaixEnabled && settings.wrapperIframe && !document.getElementById('xb-callgen'))
                 document.head.appendChild(Object.assign(document.createElement('script'), { id: 'xb-callgen', type: 'module', src: `${extensionFolderPath}/bridges/call-generate-service.js` }));
@@ -321,11 +367,17 @@ async function toggleAllFeatures(enabled) {
     } else {
         try { window.XB_captureAndStoreStates && window.XB_captureAndStoreStates(); } catch (e) { }
         cleanupAllResources();
+        if (window.messagePreviewCleanup) try { window.messagePreviewCleanup(); } catch (e) { }
+        if (window.fourthWallCleanup) try { window.fourthWallCleanup(); } catch (e) { }
         if (window.buttonCollapseCleanup) try { window.buttonCollapseCleanup(); } catch (e) { }
+        try { cleanupVariablesPanel(); } catch (e) { }
+        try { cleanupVariablesCore(); } catch (e) { }
         try { cleanupVarCommands(); } catch (e) { }
-        try { cleanupVectors(); } catch (e) { }
-        try { cleanupDirector(); } catch (e) { }
+        try { cleanupVareventEditor(); } catch (e) { }
+        try { cleanupNovelDraw(); } catch (e) { }
+        try { cleanupTts(); } catch (e) { }
         try { cleanupEnaPlanner(); } catch (e) { }
+        try { cleanupAssistant(); } catch (e) { }
         try { clearBlobCaches(); } catch (e) { }
         toggleSettingsControls(false);
         try { window.cleanupWorldbookHostBridge && window.cleanupWorldbookHostBridge(); document.getElementById('xb-worldbook')?.remove(); } catch (e) { }
@@ -361,23 +413,20 @@ async function setupSettings() {
 
         if (!settings.enabled) toggleSettingsControls(false);
 
-        document.querySelectorAll('[data-xb-module-tab]').forEach((tab) => {
-            tab.addEventListener('click', () => {
-                const key = tab.getAttribute('data-xb-module-tab');
-                document.querySelectorAll('[data-xb-module-tab]').forEach((item) => {
-                    item.classList.toggle('active', item === tab);
-                });
-                document.querySelectorAll('[data-xb-module-panel]').forEach((panel) => {
-                    panel.classList.toggle('active', panel.getAttribute('data-xb-module-panel') === key);
-                });
-            });
-        });
-
         const moduleConfigs = [
+            { id: 'xiaobaix_recorded_enabled', key: 'recorded' },
+            { id: 'xiaobaix_immersive_enabled', key: 'immersive', init: initImmersiveMode },
+            { id: 'xiaobaix_preview_enabled', key: 'preview', init: initMessagePreview },
+            { id: 'scheduled_tasks_enabled', key: 'tasks', init: initTasks },
+            { id: 'xiaobaix_template_enabled', key: 'templateEditor', init: initTemplateEditor },
+            { id: 'xiaobaix_fourth_wall_enabled', key: 'fourthWall', init: initFourthWall },
+            { id: 'xiaobaix_audio_enabled', key: 'audio', init: initControlAudio },
+            { id: 'xiaobaix_variables_panel_enabled', key: 'variablesPanel', init: initVariablesPanel },
+            { id: 'xiaobaix_variables_core_enabled', key: 'variablesCore', init: initVariablesCore },
             { id: 'xiaobaix_story_summary_enabled', key: 'storySummary' },
             { id: 'xiaobaix_story_outline_enabled', key: 'storyOutline' },
-            { id: 'xiaobaix_vectors_enabled', key: 'vectors', init: initVectors },
-            { id: 'xiaobaix_director_enabled', key: 'director', init: initDirector },
+            { id: 'xiaobaix_novel_draw_enabled', key: 'novelDraw', init: initNovelDraw },
+            { id: 'xiaobaix_tts_enabled', key: 'tts', init: initTts },
             { id: 'xiaobaix_ena_planner_enabled', key: 'enaPlanner', init: initEnaPlanner },
         ];
 
@@ -385,14 +434,17 @@ async function setupSettings() {
             $(`#${id}`).prop("checked", settings[key]?.enabled || false).on("change", async function () {
                 if (!isXiaobaixEnabled) return;
                 const enabled = $(this).prop('checked');
+                if (!enabled && key === 'fourthWall') {
+                    try { fourthWallCleanup(); } catch (e) { }
+                }
+                if (!enabled && key === 'novelDraw') {
+                    try { cleanupNovelDraw(); } catch (e) { }
+                }
+                if (!enabled && key === 'tts') {
+                    try { cleanupTts(); } catch (e) { }
+                }
                 if (!enabled && key === 'enaPlanner') {
                     try { cleanupEnaPlanner(); } catch (e) { }
-                }
-                if (!enabled && key === 'vectors') {
-                    try { cleanupVectors(); } catch (e) { }
-                }
-                if (!enabled && key === 'director') {
-                    try { cleanupDirector(); } catch (e) { }
                 }
                 settings[key] = extension_settings[EXT_ID][key] || {};
                 settings[key].enabled = enabled;
@@ -414,6 +466,31 @@ async function setupSettings() {
         });
         syncFeatureActionButtons();
 
+        // variables mode selector
+        $("#xiaobaix_variables_mode")
+            .val(settings.variablesMode || "1.0")
+            .on("change", function () {
+                settings.variablesMode = String($(this).val() || "1.0");
+                saveSettingsDebounced();
+                toastr.info(`变量系统已切换为 ${settings.variablesMode}`);
+            });
+
+        $("#xiaobaix_novel_draw_open_settings").on("click", function () {
+            if (!isXiaobaixEnabled) return;
+            if (settings.novelDraw?.enabled && window.xiaobaixNovelDraw?.openSettings) {
+                window.xiaobaixNovelDraw.openSettings();
+            }
+        });
+
+        $("#xiaobaix_tts_open_settings").on("click", function () {
+            if (!isXiaobaixEnabled) return;
+            if (settings.tts?.enabled && window.xiaobaixTts?.openSettings) {
+                window.xiaobaixTts.openSettings();
+            } else {
+                toastr.warning('请先启用 TTS 语音模块');
+            }
+        });
+
         $("#xiaobaix_ena_planner_open_settings").on("click", function () {
             if (!isXiaobaixEnabled) return;
             if (settings.enaPlanner?.enabled && window.xiaobaixEnaPlanner?.openSettings) {
@@ -423,8 +500,16 @@ async function setupSettings() {
             }
         });
 
-        $("#xiaobaix_ena_planner_open_settings_secondary").on("click", function () {
-            $("#xiaobaix_ena_planner_open_settings").trigger("click");
+        $("#xiaobaix_assistant_open_settings").on("click", async function () {
+            if (!isXiaobaixEnabled) return;
+            if (!window.xiaobaixAssistant?.openSettings) {
+                await initAssistant();
+            }
+            if (window.xiaobaixAssistant?.openSettings) {
+                window.xiaobaixAssistant.openSettings();
+            } else {
+                toastr.warning('小白助手初始化失败');
+            }
         });
 
         $("#xiaobaix_use_blob").prop("checked", !!settings.useBlob).on("change", async function () {
@@ -479,12 +564,21 @@ async function setupSettings() {
             e.preventDefault();
             e.stopPropagation();
             const MAP = {
-                storySummary: 'xiaobaix_story_summary_enabled',
-                storyOutline: 'xiaobaix_story_outline_enabled',
+                recorded: 'xiaobaix_recorded_enabled',
+                immersive: 'xiaobaix_immersive_enabled',
+                preview: 'xiaobaix_preview_enabled',
+                scriptAssistant: 'xiaobaix_script_assistant',
+                tasks: 'scheduled_tasks_enabled',
+                templateEditor: 'xiaobaix_template_enabled',
+                fourthWall: 'xiaobaix_fourth_wall_enabled',
+                variablesPanel: 'xiaobaix_variables_panel_enabled',
+                variablesCore: 'xiaobaix_variables_core_enabled',
+                novelDraw: 'xiaobaix_novel_draw_enabled',
+                tts: 'xiaobaix_tts_enabled',
                 enaPlanner: 'xiaobaix_ena_planner_enabled'
             };
-            const ON = ['storySummary'];
-            const OFF = ['storyOutline', 'enaPlanner'];
+            const ON = ['templateEditor', 'tasks', 'variablesCore', 'audio', 'storySummary', 'recorded'];
+            const OFF = ['preview', 'immersive', 'variablesPanel', 'fourthWall', 'storyOutline', 'novelDraw', 'tts', 'enaPlanner'];
             function setChecked(id, val) {
                 const el = document.getElementById(id);
                 if (el) {
@@ -577,6 +671,8 @@ jQuery(async () => {
 
         await setupSettings();
 
+        try { initControlAudio(); } catch (e) { }
+
         if (isXiaobaixEnabled) {
             initRenderer();
         }
@@ -602,18 +698,38 @@ jQuery(async () => {
 
         if (isXiaobaixEnabled) {
             try { initVarCommands(); } catch (e) { }
+            try { initVareventEditor(); } catch (e) { }
+
+            if (settings.tasks?.enabled) {
+                try { await initTasks(); } catch (e) { console.error('[Tasks] Init failed:', e); }
+            }
 
             const moduleInits = [
-                { condition: settings.vectors?.enabled, init: initVectors },
-                { condition: settings.director?.enabled, init: initDirector },
+                { condition: settings.immersive?.enabled, init: initImmersiveMode },
+                { condition: settings.templateEditor?.enabled, init: initTemplateEditor },
+                { condition: settings.fourthWall?.enabled, init: initFourthWall },
+                { condition: settings.variablesPanel?.enabled, init: initVariablesPanel },
+                { condition: settings.variablesCore?.enabled, init: initVariablesCore },
+                { condition: settings.novelDraw?.enabled, init: initNovelDraw },
+                { condition: settings.tts?.enabled, init: initTts },
                 { condition: settings.enaPlanner?.enabled, init: initEnaPlanner },
                 { condition: true, init: initStreamingGeneration },
                 { condition: true, init: initButtonCollapse }
             ];
             moduleInits.forEach(({ condition, init }) => { if (condition) init(); });
+
+            if (settings.preview?.enabled || settings.recorded?.enabled) {
+                setTimeout(initMessagePreview, 1500);
+            }
         }
 
         setTimeout(setupMenuTabs, 500);
+
+        setTimeout(() => {
+            if (window.messagePreviewCleanup) {
+                registerModuleCleanup('messagePreview', window.messagePreviewCleanup);
+            }
+        }, 2000);
 
         setInterval(() => {
             if (isXiaobaixEnabled) processExistingMessages();

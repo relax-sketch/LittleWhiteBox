@@ -246,6 +246,7 @@ export function getWrapperScript() {
 }
 
 /**
+ * 模板变量更新（template-editor 独有）
  */
 export function getTemplateExtrasScript() {
     return `
