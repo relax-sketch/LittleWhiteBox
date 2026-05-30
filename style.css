@@ -1,333 +1,6 @@
-/* ==================== 基础工具样式 ==================== */
+/* ==================== 基础样式 ==================== */
 pre:has(+ .xiaobaix-iframe) {
     display: none;
-}
-
-/* ==================== 循环任务样式 ==================== */
-.task-container {
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
-
-.task-container:empty::after {
-    content: "No tasks found";
-    font-size: 0.95em;
-    opacity: 0.7;
-    display: block;
-    text-align: center;
-}
-
-.scheduled-tasks-embedded-warning {
-    padding: 15px;
-    background: var(--SmartThemeBlurTintColor);
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 8px;
-    margin: 10px 0;
-}
-
-.warning-note {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-    padding: 8px;
-    background: rgba(255, 193, 7, 0.1);
-    border-left: 3px solid #ffc107;
-    border-radius: 4px;
-}
-
-.task-item {
-    align-items: center;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 10px;
-    padding: 0 5px;
-    margin-top: 1px;
-    margin-bottom: 1px;
-}
-
-.task-item:has(.disable_task:checked) .task_name {
-    text-decoration: line-through;
-    filter: grayscale(0.5);
-}
-
-.task_name {
-    font-weight: normal;
-    color: var(--SmartThemeEmColor);
-    font-size: 0.9em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.drag-handle {
-    cursor: grab;
-    color: var(--SmartThemeQuoteColor);
-    margin-right: 8px;
-    user-select: none;
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-}
-
-.checkbox {
-    align-items: center;
-}
-
-.task_editor {
-    width: 100%;
-}
-
-.task_editor .flex-container {
-    gap: 10px;
-}
-
-.task_editor textarea {
-    font-family: 'Courier New', monospace;
-}
-
-input.disable_task {
-    display: none !important;
-}
-
-.task-toggle-off {
-    cursor: pointer;
-    opacity: 0.5;
-    filter: grayscale(0.5);
-    transition: opacity 0.2s ease-in-out;
-}
-
-.task-toggle-off:hover {
-    opacity: 1;
-    filter: none;
-}
-
-.task-toggle-on {
-    cursor: pointer;
-}
-
-.disable_task:checked~.task-toggle-off {
-    display: block;
-}
-
-.disable_task:checked~.task-toggle-on {
-    display: none;
-}
-
-.disable_task:not(:checked)~.task-toggle-off {
-    display: none;
-}
-
-.disable_task:not(:checked)~.task-toggle-on {
-    display: block;
-}
-
-/* ==================== 沉浸式显示模式样式 ==================== */
-body.immersive-mode #chat {
-    padding: 0 !important;
-    border: 0px !important;
-    overflow-y: auto;
-    margin: 0 0px 0px 4px !important;
-    scrollbar-width: thin;
-    scrollbar-gutter: auto;
-}
-
-.xiaobaix-top-group {
-    margin-top: 1em !important;
-}
-
-@media screen and (min-width: 1001px) {
-    body.immersive-mode #chat {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-        /* IE and Edge */
-    }
-
-    body.immersive-mode #chat::-webkit-scrollbar {
-        display: none;
-    }
-}
-
-body.immersive-mode .mesAvatarWrapper {
-    margin-top: 1em;
-    padding-bottom: 0px;
-}
-
-body.immersive-mode .swipe_left,
-body.immersive-mode .swipeRightBlock {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    min-width: 1px !important;
-    min-height: 1px !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    overflow: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    clip-path: inset(50%) !important;
-}
-
-body.immersive-mode .mes {
-    margin: 2% 0 0% 0 !important;
-}
-
-body.immersive-mode .ch_name {
-    padding-bottom: 5px;
-    border-bottom: 0.5px dashed color-mix(in srgb, var(--SmartThemeEmColor) 30%, transparent);
-}
-
-body.immersive-mode .mes_block {
-    padding-left: 0 !important;
-    margin: 0 0 5px 0 !important;
-}
-
-body.immersive-mode .mes_text {
-    padding: 0px !important;
-    max-width: 100%;
-    width: 100%;
-    margin-top: 5px;
-}
-
-body.immersive-mode .mes {
-    width: 99%;
-    margin: 0 0.5%;
-    padding: 0px !important;
-}
-
-body.immersive-mode .mes_buttons,
-body.immersive-mode .mes_edit_buttons {
-    position: absolute !important;
-    top: 0 !important;
-    right: 0 !important;
-}
-
-body.immersive-mode .mes_buttons {
-    height: 20px;
-    overflow-x: clip;
-}
-
-body.immersive-mode .swipes-counter {
-    padding-left: 0px;
-    margin-bottom: 0 !important;
-}
-
-body.immersive-mode .flex-container.flex1.alignitemscenter {
-    min-height: 32px;
-}
-
-.immersive-navigation {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-top: 5px;
-    opacity: 0.7;
-}
-
-.immersive-nav-btn {
-    color: var(--SmartThemeBodyColor);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    background: none;
-    border: none;
-    font-size: 12px;
-}
-
-.immersive-nav-btn:hover:not(:disabled) {
-    background-color: rgba(var(--SmartThemeBodyColor), 0.2);
-    transform: scale(1.1);
-}
-
-.immersive-nav-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-/* ==================== 模板编辑器样式 ==================== */
-.xiaobai_template_editor {
-    max-height: 80vh;
-    overflow-y: auto;
-    padding: 20px;
-    border-radius: 8px;
-}
-
-.template-replacer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.template-replacer-title {
-    font-weight: bold;
-    color: var(--SmartThemeEmColor, #007bff);
-}
-
-.template-replacer-controls {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.template-replacer-status {
-    font-size: 12px;
-    color: var(--SmartThemeQuoteColor, #888);
-    font-style: italic;
-}
-
-.template-replacer-status.has-settings {
-    color: var(--SmartThemeEmColor, #007bff);
-}
-
-.template-replacer-status.no-character {
-    color: var(--SmartThemeCheckboxBgColor, #666);
-}
-
-/* ==================== 消息预览插件样式 ==================== */
-#message_preview_btn {
-    width: var(--bottomFormBlockSize);
-    height: var(--bottomFormBlockSize);
-    margin: 0;
-    border: none;
-    cursor: pointer;
-    opacity: 0.7;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: opacity 300ms;
-    color: var(--SmartThemeBodyColor);
-    font-size: var(--bottomFormIconSize);
-}
-
-#message_preview_btn:hover {
-    opacity: 1;
-    filter: brightness(1.2);
-}
-
-.message-preview-content-box {
-    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
-    white-space: pre-wrap;
-    max-height: 82vh;
-    overflow-y: auto;
-    padding: 15px;
-    background: #000000 !important;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 5px;
-    color: #ffffff !important;
-    font-size: 12px;
-    line-height: 1.4;
-    text-align: left;
-    padding-bottom: 80px;
-}
-
-.mes_history_preview {
-    opacity: 0.6;
-    transition: opacity 0.2s ease-in-out;
-}
-
-.mes_history_preview:hover {
-    opacity: 1;
 }
 
 /* ==================== 设置菜单和标签样式 ==================== */
@@ -353,85 +26,6 @@ body.immersive-mode .flex-container.flex1.alignitemscenter {
 
 .settings-section {
     padding: 10px 0;
-}
-
-/* ==================== Wallhaven自定义标签样式 ==================== */
-.custom-tags-container {
-    margin-top: 10px;
-}
-
-.custom-tags-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-    min-height: 20px;
-    padding: 8px;
-    background: #2a2a2a;
-    border-radius: 4px;
-    border: 1px solid #444;
-}
-
-.custom-tag-item {
-    display: flex;
-    align-items: center;
-    background: #007acc;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    gap: 6px;
-}
-
-.custom-tag-text {
-    font-weight: 500;
-}
-
-.custom-tag-remove {
-    cursor: pointer;
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: bold;
-    transition: color 0.2s ease;
-}
-
-.custom-tag-remove:hover {
-    color: #ff6b6b;
-}
-
-.custom-tags-empty {
-    color: #888;
-    font-style: italic;
-    font-size: 12px;
-    text-align: center;
-    padding: 8px;
-}
-
-.task_editor .menu_button{
-  white-space: nowrap;
-}
-
-.message-preview-content-box:hover::-webkit-scrollbar-thumb,
-.xiaobai_template_editor:hover::-webkit-scrollbar-thumb {
-    background: var(--SmartThemeAccent);
-}
-
-/* ==================== 滚动条样式 ==================== */
-.message-preview-content-box::-webkit-scrollbar,
-.xiaobai_template_editor::-webkit-scrollbar {
-    width: 5px;
-}
-
-.message-preview-content-box::-webkit-scrollbar-track,
-.xiaobai_template_editor::-webkit-scrollbar-track {
-    background: var(--SmartThemeBlurTintColor);
-    border-radius: 3px;
-}
-
-.message-preview-content-box::-webkit-scrollbar-thumb,
-.xiaobai_template_editor::-webkit-scrollbar-thumb {
-    background: var(--SmartThemeBorderColor);
-    border-radius: 3px;
-
 }
 
 /* ==================== Story Outline PromptManager 编辑表单 ==================== */
@@ -479,4 +73,1129 @@ body.immersive-mode .flex-container.flex1.alignitemscenter {
 
 #completion_prompt_manager_footer_append_prompt option[value="lwb_story_outline"] {
     display: none;
+}
+
+/* vectors-enhanced module styles */
+/* Vector Storage Enhanced Extension Styles */
+
+/* External Tasks Styles */
+.external-tasks-container {
+    margin-top: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.external-task-item {
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: var(--SmartThemeBlurTintColor);
+}
+
+.external-task-item .task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.external-task-item .task-name {
+    font-weight: bold;
+    flex: 1;
+}
+
+.external-task-item .task-status {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.external-task-item .status-pending { background: #f0ad4e; color: white; }
+.external-task-item .status-queued { background: #5bc0de; color: white; }
+.external-task-item .status-running { background: #337ab7; color: white; }
+.external-task-item .status-completed { background: #5cb85c; color: white; }
+.external-task-item .status-failed { background: #d9534f; color: white; }
+.external-task-item .status-cancelled { background: #868686; color: white; }
+
+.external-task-item .task-info {
+    font-size: 0.9em;
+    color: var(--SmartThemeEmColor);
+    margin-bottom: 5px;
+}
+
+.external-task-item .task-info small {
+    margin-right: 10px;
+}
+
+/* Import button styles */
+#vectors_enhanced_import_external_task {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+#vectors_enhanced_import_external_task:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#vectors_enhanced_import_external_task:active {
+    transform: translateY(0);
+}
+
+#vectors_enhanced_import_external_task i {
+    font-size: 1em;
+}
+
+.external-task-item .task-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.external-task-item .task-actions button {
+    font-size: 0.9em;
+    padding: 5px 10px;
+}
+
+.no-external-tasks {
+    text-align: center;
+    color: var(--SmartThemeEmColor);
+    padding: 20px;
+}
+
+/* Import Dialog Styles - 使用默认样式 */
+.external-task-import-dialog .dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.external-task-import-dialog #source-tasks-list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+    margin-top: 5px;
+}
+
+.external-task-import-dialog .task-select-item {
+    margin-bottom: 8px;
+}
+
+.external-task-import-dialog .task-select-item label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.external-task-import-dialog .task-checkbox {
+    margin-right: 8px;
+}
+
+
+/* Task Details Dialog */
+.external-task-details {
+    padding: 20px;
+}
+
+.external-task-details h3 {
+    margin-bottom: 15px;
+}
+
+.external-task-details .detail-row {
+    margin-bottom: 10px;
+}
+
+.external-task-details .detail-row strong {
+    display: inline-block;
+    width: 120px;
+}
+
+.external-task-details pre {
+    background: var(--SmartThemeBlurTintColor);
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 5px;
+    overflow-x: auto;
+}
+
+.vectors_enhanced_settings {
+    padding: 0.5rem;
+}
+
+.vectors-enhanced-section {
+    margin-bottom: 1rem;
+}
+
+.vectors-enhanced-section h3 {
+    margin-bottom: 0.75rem;
+    color: var(--SmartThemeBodyColor);
+}
+
+.vectors-enhanced-section h4 {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+/* Content selection styles */
+.content-type-section {
+    margin: 0.5rem 0;
+}
+
+.content-settings {
+    margin-left: 1.5rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border-left: 2px solid var(--SmartThemeBorderColor);
+}
+
+.file-list, .wi-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.file-list label {
+    display: flex;
+    align-items: center;
+    margin: 0.25rem 0;
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+/* Tag suggestion styles */
+#vectors_enhanced_tag_suggestions {
+    background: var(--SmartThemeBlurTintColor);
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+#vectors_enhanced_tag_list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.tag-suggestion-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.8em !important;
+    padding: 2px 6px !important;
+    margin: 1px;
+    background: var(--SmartThemeQuoteColor) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 3px !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tag-suggestion-btn:hover {
+    background: var(--SmartThemeEmColor) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    max-width: none;
+    overflow: visible;
+    z-index: 10;
+    position: relative;
+}
+
+#vectors_enhanced_clear_suggestions {
+    padding: 2px 6px;
+    font-size: 0.8em;
+    margin-left: 0.5rem;
+}
+
+.tag-scan-stats {
+    font-family: monospace;
+    font-size: 0.75em;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.file-list label:hover {
+    background-color: var(--SmartThemeBlurTintColor);
+}
+
+.file-list label input {
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+}
+
+.file-list label span {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wi-world-group {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
+.wi-world-header {
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.wi-world-name {
+    font-weight: bold;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.wi-list .wi-entry {
+    margin-left: 1.5rem;
+    font-size: 0.9em;
+    padding: 0.25rem;
+}
+
+.wi-list .wi-entry:hover {
+    background-color: var(--SmartThemeBlurTintColor);
+}
+
+.wi-list .wi-entry input {
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+}
+
+.wi-list .wi-entry span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Action buttons */
+.vectors-enhanced-actions {
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.vectors-enhanced-actions button {
+    flex: 1;
+    max-width: 150px;
+}
+
+/* Status messages */
+.vectors-enhanced-status {
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background-color: var(--SmartThemeBlurTintColor);
+}
+
+.vectors-enhanced-status.success {
+    color: var(--SmartThemeQuoteColor);
+}
+
+.vectors-enhanced-status.error {
+    color: var(--SmartThemeErrorColor);
+}
+
+/* Progress bar styles */
+.vectors-enhanced-progress {
+    text-align: center;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: var(--SmartThemeBorderColor);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar-inner {
+    height: 100%;
+    background-color: var(--SmartThemeQuoteColor);
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.9em;
+    color: var(--SmartThemeBodyColor);
+}
+
+/* Preview modal styles */
+.vector-preview {
+    height: 70vh;
+    max-height: 800px;
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-header {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: var(--SmartThemeBodyColor);
+    flex-shrink: 0;
+}
+
+.preview-sections {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+}
+
+.preview-section {
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.preview-section-title {
+    background-color: var(--SmartThemeQuoteColor);
+    color: var(--SmartThemeBotMesTextColor, white);
+    padding: 0.75rem;
+    font-weight: bold;
+    font-size: 1.1em;
+    flex-shrink: 0;
+    border-radius: 8px 8px 0 0; /* 顶部圆角 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-section-content {
+    flex: 1;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    padding: 1rem;
+    min-height: 0;
+    height: 100%; /* 占满剩余高度 */
+    position: relative;
+    border-radius: 0 0 8px 8px; /* 底部圆角 */
+}
+
+/* 强制聊天消息滚动 */
+.preview-section-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.preview-section-content::-webkit-scrollbar-track {
+    background: var(--SmartThemeBorderColor);
+    border-radius: 4px;
+}
+
+.preview-section-content::-webkit-scrollbar-thumb {
+    background: var(--SmartThemeQuoteColor);
+    border-radius: 4px;
+}
+
+.preview-section-content::-webkit-scrollbar-thumb:hover {
+    background: var(--SmartThemeBodyColor);
+}
+
+.preview-item {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--SmartThemeBlurTintColor);
+    border-radius: 4px;
+}
+
+.preview-empty {
+    color: var(--SmartThemeEmColor);
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+}
+
+.preview-world-group {
+    margin-bottom: 1rem;
+}
+
+.preview-world-name {
+    font-weight: bold;
+    color: var(--SmartThemeQuoteColor);
+    margin-bottom: 0.5rem;
+}
+
+.preview-world-entry {
+    padding-left: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.preview-chat-message {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: var(--SmartThemeBlurTintColor);
+    border-radius: 6px;
+}
+
+.preview-chat-header {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: var(--SmartThemeQuoteColor);
+}
+
+.preview-chat-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+    text-align: left;
+}
+
+/* Responsive preview for smaller screens */
+@media (max-width: 1200px) {
+    .preview-sections {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(3, 1fr);
+    }
+}
+
+/* Radio group adjustments */
+.vectors_enhanced_settings .radio_group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.vectors_enhanced_settings .radio_group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .content-settings {
+        margin-left: 0.5rem;
+    }
+
+    .vectors-enhanced-actions {
+        flex-direction: column;
+    }
+
+    .vectors-enhanced-actions button {
+        max-width: 100%;
+    }
+}
+
+/* Refresh button width fix */
+#vectors_enhanced_files_refresh,
+#vectors_enhanced_wi_refresh {
+    width: 100%;
+    white-space: nowrap;
+}
+
+/* File group headers */
+.file-group-header {
+    font-weight: bold;
+    color: var(--SmartThemeBodyColor);
+    margin-bottom: 0.25rem;
+}
+
+/* Utility classes */
+.m-t-0-5 { margin-top: 0.5rem; }
+.m-b-0-5 { margin-bottom: 0.5rem; }
+.m-t-1 { margin-top: 1rem; }
+.m-b-1 { margin-bottom: 1rem; }
+.margin-bottom-10px { margin-bottom: 10px; }
+
+.text-overflow-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Task list styles */
+.task-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 10px 0;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
+.vector-enhanced-task-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: var(--SmartThemeBlurTintColor);
+    border-radius: 5px;
+    gap: 10px;
+    min-height: 40px;
+}
+
+.vector-enhanced-task-item .task-main-row,
+.vector-enhanced-task-item .task-controls-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.vector-enhanced-task-item .task-main-row {
+    min-width: 0;
+}
+
+.vector-enhanced-task-item .task-controls-row {
+    justify-content: flex-end;
+}
+
+.vector-enhanced-task-item:last-child {
+    margin-bottom: 0;
+}
+
+.vector-enhanced-task-item label {
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    min-width: 0; /* 允许收缩 */
+}
+
+.vector-enhanced-task-item .button-group {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex-shrink: 1;
+    max-width: 100%;
+}
+
+.vector-enhanced-task-item .vectors-task-weight {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    font-size: 0.85em;
+    cursor: default;
+}
+
+.vector-enhanced-task-item .vectors-task-weight input {
+    width: 64px;
+    min-width: 64px;
+    height: 32px;
+    padding: 2px 5px;
+    text-align: center;
+}
+
+.vector-enhanced-task-item button {
+    padding: 6px 10px;
+    font-size: 0.9em;
+    flex-shrink: 0;
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vector-enhanced-task-item small {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.85em;
+}
+/* Custom UI Tweaks for titles and info text */
+.vectors-enhanced-subsection-title {
+    font-size: 1.15em;
+    font-weight: bold;
+    color: var(--SmartThemeBodyColor);
+}
+
+#vectors_enhanced_hidden_info .text-muted strong {
+    font-size: 0.85em;
+    font-weight: normal;
+    color: var(--SmartThemeEmColor);
+}
+
+#vectors_enhanced_rules_editor .text-muted {
+    font-size: 0.85em;
+    color: var(--SmartThemeEmColor);
+}
+
+/* Fix inconsistent font sizes for checkbox labels and tooltips */
+.checkbox_label.m-t-0-5 span {
+    font-size: 0.9em;
+}
+
+/* Tag preset management styles */
+.tag-preset-management {
+    background: var(--SmartThemeBlurTintColor);
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
+.tag-preset-management .flex-container {
+    gap: 0.5rem;
+}
+
+#vectors_enhanced_tag_preset_selector {
+    min-width: 150px;
+}
+
+#vectors_enhanced_tag_preset_save {
+    white-space: nowrap;
+}
+
+/* External Task Styles - 外挂任务样式（旧版已移除，使用新的布局样式） */
+
+/* 任务列表项统一高度 */
+.vector-enhanced-task-item .checkbox_label {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 2px 0;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    width: 100%;
+}
+
+/* 任务内容区域 */
+.vector-enhanced-task-item .checkbox_label .task-content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0; /* 允许收缩 */
+}
+
+/* 任务名称样式 - 支持省略号 */
+.vector-enhanced-task-item .checkbox_label .task-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0; /* 允许收缩 */
+    margin-right: 4px;
+}
+
+/* 外挂任务标记 - 固定宽度，不被压缩 */
+.vector-enhanced-task-item .checkbox_label .external-task-badge {
+    flex-shrink: 0;
+    width: 1.2em;
+    text-align: center;
+    opacity: 0.8;
+    font-size: 0.9em;
+}
+
+/* 任务信息（小字部分） */
+.vector-enhanced-task-item .checkbox_label .task-info {
+    display: block;
+    font-size: 0.85em;
+    color: var(--SmartThemeEmColor);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 外挂任务样式 - 与普通任务保持一致 */
+.vector-enhanced-task-item .checkbox_label.external-task {
+    /* 与普通任务完全一致，无特殊样式 */
+}
+
+/* 孤儿任务稍微降低透明度 */
+.vector-enhanced-task-item .checkbox_label.external-task.orphaned {
+    opacity: 0.7;
+}
+
+/* 孤儿任务文本样式 */
+.vector-enhanced-task-item .orphaned-task {
+    color: var(--SmartThemeQuoteColor);
+    text-decoration: line-through;
+}
+
+/* 孤儿任务的外挂标记 */
+.vector-enhanced-task-item .checkbox_label.external-task.orphaned .external-task-badge {
+    filter: grayscale(100%);
+}
+
+/* 禁用的外挂任务 */
+.vector-enhanced-task-item .checkbox_label.external-task input[type="checkbox"]:not(:checked) ~ .task-content {
+    opacity: 0.7;
+}
+
+/* 导入外挂任务按钮样式 */
+#vectors_enhanced_import_external_task {
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+#vectors_enhanced_import_external_task:hover {
+    background: var(--SmartThemeEmColor);
+    border-color: var(--SmartThemeQuoteColor);
+}
+
+#vectors_enhanced_import_external_task i {
+    font-size: 0.9em;
+}
+
+/* 查询存储地址按钮样式 */
+#vectors_enhanced_query_storage_path {
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+#vectors_enhanced_query_storage_path:hover {
+    background: var(--SmartThemeEmColor);
+    border-color: var(--SmartThemeQuoteColor);
+}
+
+#vectors_enhanced_query_storage_path i {
+    font-size: 0.9em;
+}
+
+/* Master switch control - 总开关控制 */
+/* 当总开关关闭时，隐藏除了总开关区域外的所有内容 */
+#vectors_enhanced_container:has(#vectors_enhanced_master_enabled:not(:checked)) .vectors-enhanced-section:not(:first-child) {
+    display: none !important;
+}
+
+/* WestWorld director module styles */
+/* ============================================
+  WestWorld - 深色主题样式
+   参考 st-beat-tracker-main 设计风格
+   ============================================ */
+
+/* --- [SECTION 1] CSS 变量定义 --- */
+:root {
+  --sw-bg-darker: #121212;
+  --sw-bg-dark: #1e1e1e;
+  --sw-bg-medium: #2c2c2e;
+  --sw-border-color: #38383a;
+  --sw-text-light: rgba(255, 255, 255, 0.9);
+  --sw-text-medium: rgba(255, 255, 255, 0.65);
+  --sw-text-dim: rgba(255, 255, 255, 0.45);
+  --sw-primary-accent: #0a84ff;
+  --sw-primary-accent-hover: #3399ff;
+  --sw-success-color: #30d158;
+  --sw-warning-color: #ff9f0a;
+  --sw-danger-color: #ff453a;
+  
+  --sw-space-4: 4px;
+  --sw-space-8: 8px;
+  --sw-space-12: 12px;
+  --sw-space-16: 16px;
+  --sw-space-20: 20px;
+  --sw-space-24: 24px;
+}
+
+/* --- [SECTION 2] 抽屉组件基础布局 --- */
+#westworld-wrapper {
+  margin-top: 8px;
+}
+
+#westworld-wrapper .drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#westworld-wrapper #westworld-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+#westworld-wrapper #westworld-icon.openIcon {
+  color: var(--sw-primary-accent);
+}
+
+#westworld-wrapper #westworld-icon.closedIcon {
+  color: var(--sw-text-medium);
+}
+
+#westworld-wrapper #westworld-icon:hover {
+  color: var(--sw-primary-accent-hover);
+}
+
+/* --- [SECTION 3] 内容面板样式 --- */
+#westworld-wrapper #westworld-content-panel {
+  display: none;
+  position: absolute;
+  top: var(--topBarBlockSize, 38px);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  max-height: calc(100vh - calc(var(--topBarBlockSize, 38px) + var(--bottomFormBlockSize, 0px)));
+  max-height: calc(100dvh - calc(var(--topBarBlockSize, 38px) + var(--bottomFormBlockSize, 0px)));
+  background: linear-gradient(180deg, var(--sw-bg-dark) 0%, var(--sw-bg-darker) 100%);
+  border: 1px solid var(--sw-border-color);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1049;
+  color: var(--sw-text-light);
+  overflow: hidden;
+}
+
+#westworld-wrapper #westworld-content-panel.openDrawer {
+  display: block;
+}
+
+/* --- [SECTION 4] 面板头部 --- */
+#westworld-wrapper .drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sw-space-12) var(--sw-space-16);
+  background-color: var(--sw-bg-dark);
+  border-bottom: 1px solid var(--sw-border-color);
+}
+
+#westworld-wrapper .drawer-header h3 {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-8);
+}
+
+#westworld-wrapper .drawer-header h3 i {
+  color: var(--sw-primary-accent);
+}
+
+#westworld-wrapper .sw-version {
+  font-size: 0.8em;
+  color: var(--sw-text-dim);
+  padding: 2px 8px;
+  background-color: var(--sw-bg-medium);
+  border-radius: 10px;
+}
+
+/* --- [SECTION 5] 主内容区 --- */
+.sw-panels-wrapper {
+  padding: var(--sw-space-16);
+  overflow-y: auto;
+  max-height: calc(80vh - 60px);
+}
+
+/* --- [SECTION 6] 卡片样式 --- */
+.sw-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid var(--sw-border-color);
+  border-radius: 10px;
+  padding: var(--sw-space-16);
+  margin-bottom: var(--sw-space-16);
+}
+
+.sw-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-8);
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--sw-text-light);
+  margin-bottom: var(--sw-space-12);
+}
+
+.sw-card-header i {
+  color: var(--sw-primary-accent);
+}
+
+.sw-description {
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.6;
+  color: var(--sw-text-medium);
+}
+
+/* --- [SECTION 7] 操作按钮区 --- */
+.sw-actions-card {
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.08) 0%, rgba(10, 132, 255, 0.02) 100%);
+  border: 1px solid rgba(10, 132, 255, 0.25);
+  border-radius: 10px;
+  padding: var(--sw-space-20);
+  margin-bottom: var(--sw-space-16);
+  text-align: center;
+}
+
+.sw-primary-btn {
+  width: 100%;
+  padding: 12px 24px;
+  font-size: 1em;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--sw-primary-accent) 0%, #0077ed 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sw-space-8);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3);
+}
+
+.sw-primary-btn:hover {
+  background: linear-gradient(135deg, var(--sw-primary-accent-hover) 0%, #1a85ff 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(10, 132, 255, 0.4);
+}
+
+.sw-primary-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);
+}
+
+.sw-primary-btn i {
+  font-size: 1.1em;
+}
+
+/* --- [SECTION 8] 功能特性列表 --- */
+.sw-features {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sw-space-12);
+}
+
+.sw-feature-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-8);
+  padding: var(--sw-space-12);
+  background-color: var(--sw-bg-medium);
+  border: 1px solid var(--sw-border-color);
+  border-radius: 8px;
+  font-size: 0.85em;
+  color: var(--sw-text-medium);
+  transition: all 0.2s ease;
+}
+
+.sw-feature-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(10, 132, 255, 0.4);
+}
+
+.sw-feature-item i {
+  color: var(--sw-primary-accent);
+  font-size: 1em;
+}
+
+/* --- [SECTION 9] 内容面板尺寸控制 --- */
+#westworld-wrapper.drawer .drawer-content {
+  width: min(480px, 92vw);
+}
+
+/* --- [SECTION 10] 滚动条样式 --- */
+.sw-panels-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sw-panels-wrapper::-webkit-scrollbar-track {
+  background: var(--sw-bg-darker);
+}
+
+.sw-panels-wrapper::-webkit-scrollbar-thumb {
+  background-color: var(--sw-bg-medium);
+  border-radius: 3px;
+}
+
+.sw-panels-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: #555c6e;
+}
+
+/* --- [SECTION 11] 响应式适配 --- */
+@media (max-width: 680px) {
+  #westworld-wrapper.drawer .drawer-content {
+    width: 96vw;
+    left: 2vw;
+    right: 2vw;
+  }
+  
+  .sw-features {
+    grid-template-columns: 1fr;
+  }
+  
+  .sw-panels-wrapper {
+    padding: var(--sw-space-12);
+  }
+}
+
+@media (max-width: 400px) {
+  #westworld-wrapper .drawer-header h3 {
+    font-size: 1em;
+  }
+  
+  .sw-primary-btn {
+    font-size: 0.9em;
+    padding: 10px 16px;
+  }
+}
+
+.xiaobaix-unified-modules {
+    margin-top: 12px;
+}
+
+.xiaobaix-module-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.xiaobaix-module-tab {
+    border: 1px solid var(--SmartThemeBorderColor, #666);
+    background: var(--SmartThemeBlurTintColor, transparent);
+    color: var(--SmartThemeBodyColor, inherit);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.xiaobaix-module-tab.active {
+    background: var(--SmartThemeQuoteColor, #444);
+}
+
+.xiaobaix-module-panel {
+    display: none;
+}
+
+.xiaobaix-module-panel.active {
+    display: block;
 }

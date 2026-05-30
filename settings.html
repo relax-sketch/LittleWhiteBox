@@ -10,9 +10,7 @@
     <div class="littlewhitebox settings-grid">
       <div class="settings-menu-vertical">
         <div class="menu-tab active" data-target="js-memory" style="border-bottom:1px solid #303030;"><span class="vertical-text">渲染交互</span></div>
-        <div class="menu-tab" data-target="task" style="border-bottom:1px solid #303030;"><span class="vertical-text">循环任务</span></div>
         <div class="menu-tab" data-target="template" style="border-bottom:1px solid #303030;"><span class="vertical-text">数据互动</span></div>
-        <div class="menu-tab" data-target="wallhaven" style="border-bottom:1px solid #303030;"><span class="vertical-text">辅助工具</span></div>
       </div>
       <div class="settings-content">
         <div class="js-memory settings-section" style="display:block;">
@@ -25,16 +23,10 @@
                         提供STscript(command)异步函数执行酒馆命令:
 
                         await STscript('/echo 你好世界！')">启用小白X</label>
-            <div class="littlewhitebox-top-actions">
-              <button id="xiaobaix_assistant_open_settings" class="menu_button menu_button_icon littlewhitebox-top-action-button" type="button" title="打开小白助手">
-                <span>小白助手</span>
-              </button>
-            </div>
           </div>
           <div class="flex-container alignItemsCenter" style="gap:8px;flex-wrap:wrap;">
             <input type="checkbox" id="xiaobaix_render_enabled" />
-            <label for="xiaobaix_render_enabled" class="has-tooltip" data-tooltip="控制代码块转换为iframe渲染的功能
-关闭后将清理所有已渲染的iframe">渲染开关</label>
+            <label for="xiaobaix_render_enabled" class="has-tooltip" data-tooltip="控制代码块转换为iframe渲染的功能。关闭后将清理所有已渲染的iframe">渲染开关</label>
             <label for="xiaobaix_max_rendered" style="margin-left:8px;">渲染楼层</label>
             <input id="xiaobaix_max_rendered"
                    type="number"
@@ -51,33 +43,7 @@
           </div>
           <div class="flex-container">
             <input type="checkbox" id="Wrapperiframe" />
-            <label for="Wrapperiframe" class="has-tooltip" data-tooltip="按需在 iframe 中注入 Wrapperiframe.js">启用封装函数</label>
-          </div>
-          <div class="flex-container alignItemsCenter" style="gap:8px;flex-wrap:wrap;">
-            <input type="checkbox" id="xiaobaix_audio_enabled" />
-            <label for="xiaobaix_audio_enabled" style="margin-top:0;">启用音频</label>
-          </div>
-          <br>
-          <div class="section-divider">流式，非基础的渲染
-            <hr class="sysHR" />
-          </div>
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_template_enabled" />
-            <label for="xiaobaix_template_enabled" class="has-tooltip" data-tooltip="流式多楼层动态渲染">启用沉浸式模板</label>
-          </div>
-          <div id="current_template_settings">
-            <div class="template-replacer-header">
-              <div class="template-replacer-title">当前角色模板设置</div>
-              <div class="template-replacer-controls">
-                <button id="open_template_editor" class="menu_button menu_button_icon">
-                  <i class="fa-solid fa-pen-to-square"></i>
-                  <small>编辑模板</small>
-                </button>
-              </div>
-            </div>
-            <div class="template-replacer-status" id="template_character_status">
-              请选择一个角色
-            </div>
+            <label for="Wrapperiframe" class="has-tooltip" data-tooltip="按需向 iframe 中注入 Wrapperiframe.js">启用封装函数</label>
           </div>
           <div class="section-divider">功能说明
             <hr class="sysHR" />
@@ -92,114 +58,7 @@
             </button>
           </div>
         </div>
-        <div class="wallhaven settings-section" style="display:none;">
-          <div class="section-divider">消息日志与拦截
-            <hr class="sysHR">
-          </div>
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_recorded_enabled" />
-            <label for="xiaobaix_recorded_enabled" class="has-tooltip" data-tooltip="每条消息添加图标，点击可看到发送给时AI的记录">Log记录</label>
-            <input type="checkbox" id="xiaobaix_preview_enabled" />
-            <label for="xiaobaix_preview_enabled" class="has-tooltip" data-tooltip="在聊天框显示图标，点击可拦截将发送给AI的消息并显示">Log拦截</label>
-          </div>
-          <div class="section-divider">视觉增强
-            <hr class="sysHR" />
-          </div>
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_immersive_enabled" />
-            <label for="xiaobaix_immersive_enabled" class="has-tooltip" data-tooltip="重构界面布局与细节优化">沉浸布局显示(边框窄化)</label>
-          </div>
-          <div class="section-divider">Novel 画图
-            <hr class="sysHR" />
-          </div>
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_novel_draw_enabled" />
-            <label for="xiaobaix_novel_draw_enabled" class="has-tooltip" data-tooltip="使用 NovelAI 为 AI 回复自动或手动生成配图，需在酒馆设置中配置 NovelAI Key">启用 Novel 画图</label>
-            <button id="xiaobaix_novel_draw_open_settings" class="menu_button menu_button_icon" type="button" style="margin-left:auto;" title="打开 Novel 画图详细设置">
-              <i class="fa-solid fa-palette"></i>
-              <small>画图设置</small>
-            </button>
-          </div>
-          <div class="section-divider">豆包 语音
-            <hr class="sysHR" />
-          </div>
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_tts_enabled" />
-            <label for="xiaobaix_tts_enabled" class="has-tooltip"
-                   data-tooltip="AI回复渲染后自动朗读。需要先在 config.yaml 开启 enableCorsProxy: true 并重启。所有请求通过 ST 内置代理，不经过第三方。">
-              启用 TTS 语音
-            </label>
-            <button id="xiaobaix_tts_open_settings" class="menu_button menu_button_icon"
-                    type="button" style="margin-left:auto;"
-                    title="打开 TTS 设置（音色/复刻/跳过规则）">
-              <i class="fa-solid fa-microphone-lines"></i>
-              <small>语音设置</small>
-            </button>
-          </div>
-        </div>
-        <div class="task settings-section" style="display:none;">
-          <div class="section-divider">循环任务
-            <hr class="sysHR" />
-          </div>
-          <div class="flex-container">
-            <input type="checkbox" id="scheduled_tasks_enabled" />
-            <label for="scheduled_tasks_enabled" class="has-tooltip" data-tooltip="自动执行设定好的斜杠命令
-                        输入/xbqte {{任务名称}}可以手动激活任务
-                        导出/入角色卡时, 角色任务会随角色卡一起导出/入">启用循环任务</label>
-          <div id="toggle_task_bar" class="menu_button menu_button_icon" style="margin: 0px; margin-left: auto;" title="显示/隐藏按钮栏">
-            <small>按钮栏</small>
-          </div>
-          </div>
-          <hr class="sysHR" />
-          <div class="flex-container task-tab-bar">
-            <div class="task-tab active" data-target="global_tasks_block">全局任务<span class="task-count" id="global_task_count"></span></div>
-            <div class="task-tab" data-target="character_tasks_block">角色任务<span class="task-count" id="character_task_count"></span></div>
-            <div class="task-tab" data-target="preset_tasks_block">预设任务<span class="task-count" id="preset_task_count"></span></div>
-          </div>
-          <div class="flex-container" style="justify-content: flex-end; flex-wrap: nowrap; gap: 0px; margin-top: 10px;">
-            <div id="add_global_task" class="menu_button menu_button_icon" title="添加全局任务">
-              <small>+全局</small>
-            </div>
-            <div id="add_character_task" class="menu_button menu_button_icon" title="添加角色任务">
-              <small>+角色</small>
-            </div>
-            <div id="add_preset_task" class="menu_button menu_button_icon" title="添加预设任务">
-              <small>+预设</small>
-            </div>
-            <div id="cloud_tasks_button" class="menu_button menu_button_icon" title="从云端获取任务脚本">
-              <i class="fa-solid fa-cloud-arrow-down"></i>
-              <small>任务下载</small>
-            </div>
-            <div id="import_global_tasks" class="menu_button menu_button_icon" title="导入任务">
-              <i class="fa-solid fa-download"></i>
-              <small>导入</small>
-            </div>
-          </div>
-          <hr class="sysHR">
-          <div class="task-panel-group">
-            <div id="global_tasks_block" class="padding5 task-panel" data-panel="global_tasks_block">
-              <small>这些任务在所有角色中的聊天都会执行</small>
-              <div id="global_tasks_list" class="flex-container task-container flexFlowColumn"></div>
-            </div>
-            <div id="character_tasks_block" class="padding5 task-panel" data-panel="character_tasks_block" style="display:none;">
-              <small>这些任务只在当前角色的聊天中执行</small>
-              <div id="character_tasks_list" class="flex-container task-container flexFlowColumn"></div>
-            </div>
-            <div id="preset_tasks_block" class="padding5 task-panel" data-panel="preset_tasks_block" style="display:none;">
-              <small>这些任务会在使用<small id="preset_tasks_hint" class="preset-task-hint">未选择</small>预设时执行</small>
-              <div id="preset_tasks_list" class="flex-container task-container flexFlowColumn"></div>
-            </div>
-          </div>
-          <input type="file" id="import_tasks_file" accept=".json" style="display:none;" />
-        </div>
         <div class="template settings-section" style="display:none;">
-          <div class="section-divider">四次元壁</div>
-          <hr class="sysHR" />
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_fourth_wall_enabled" />
-            <label for="xiaobaix_fourth_wall_enabled" class="has-tooltip" data-tooltip="突破第四面墙，与角色进行元对话交流。悬浮按钮位于页面右侧中间。">四次元壁</label>
-          </div>
-          <br>
           <div class="section-divider">剧情管理</div>
           <hr class="sysHR" />
           <div class="flex-container">
@@ -218,29 +77,39 @@
               <small>规划设置</small>
             </button>
           </div>
-          <br>
-          <div class="section-divider">变量控制</div>
-          <hr class="sysHR" />
-          <div class="flex-container" style="gap:8px;flex-wrap:wrap;align-items:center;">
-            <input type="checkbox" id="xiaobaix_variables_core_enabled" />
-            <label for="xiaobaix_variables_core_enabled">变量管理</label>
-
-            <select id="xiaobaix_variables_mode" class="text_pole" style="width:auto;margin-left:8px;padding:2px 6px;">
-              <option value="1.0">1.0 (plot-log)</option>
-              <option value="2.0">2.0 (state)</option>
-            </select>
-          </div>
-
-          <div class="flex-container">
-            <input type="checkbox" id="xiaobaix_variables_panel_enabled" />
-            <label for="xiaobaix_variables_panel_enabled">变量面板</label>
+          <div id="xiaobaix_unified_modules" class="xiaobaix-unified-modules">
+            <div class="xiaobaix-module-tabs" role="tablist">
+              <button type="button" class="xiaobaix-module-tab active" data-xb-module-tab="ena">Ena Planner</button>
+              <button type="button" class="xiaobaix-module-tab" data-xb-module-tab="vectors">Vectors</button>
+              <button type="button" class="xiaobaix-module-tab" data-xb-module-tab="director">Director</button>
+              <button type="button" class="xiaobaix-module-tab" data-xb-module-tab="preset">Preset Entries</button>
+            </div>
+            <div class="xiaobaix-module-panel active" data-xb-module-panel="ena">
+              <button type="button" id="xiaobaix_ena_planner_open_settings_secondary" class="menu_button">Open Ena Planner</button>
+            </div>
+            <div class="xiaobaix-module-panel" data-xb-module-panel="vectors">
+              <label class="checkbox_label">
+                <input type="checkbox" id="xiaobaix_vectors_enabled">
+                Enable vectors retrieval
+              </label>
+              <div id="xiaobaix_vectors_settings_mount"></div>
+            </div>
+            <div class="xiaobaix-module-panel" data-xb-module-panel="director">
+              <label class="checkbox_label">
+                <input type="checkbox" id="xiaobaix_director_enabled">
+                Enable director
+              </label>
+              <div id="xiaobaix_director_settings_mount"></div>
+            </div>
+            <div class="xiaobaix-module-panel" data-xb-module-panel="preset">
+              <p class="notes">Preset entries are created as <code>vectorsResults</code> and <code>westworldDirector</code>. Position them in the active preset prompt order.</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
 </div>
-
 <style>
   .littlewhitebox,
   .littlewhitebox * {
@@ -581,27 +450,16 @@
     }
 	    const EXT_ID = 'LittleWhiteBox';
 	    const KEY_TO_CHECKBOX = {
-	      recorded: 'xiaobaix_recorded_enabled',
-	      immersive: 'xiaobaix_immersive_enabled',
-	      preview: 'xiaobaix_preview_enabled',
-	      scriptAssistant: 'xiaobaix_script_assistant',
-	      tasks: 'scheduled_tasks_enabled',
-	      templateEditor: 'xiaobaix_template_enabled',
-	      fourthWall: 'xiaobaix_fourth_wall_enabled',
-	      variablesPanel: 'xiaobaix_variables_panel_enabled',
-	      variablesCore: 'xiaobaix_variables_core_enabled',
-	      audio: 'xiaobaix_audio_enabled',
-	      storySummary: 'xiaobaix_story_summary_enabled',
-	      tts: 'xiaobaix_tts_enabled',
+      storySummary: 'xiaobaix_story_summary_enabled',
       enaPlanner: 'xiaobaix_ena_planner_enabled',
       storyOutline: 'xiaobaix_story_outline_enabled',
       useBlob: 'xiaobaix_use_blob',
-	      wrapperIframe: 'Wrapperiframe',
-	      renderEnabled: 'xiaobaix_render_enabled',
-	    };
-	    const DEFAULTS_ON = ['templateEditor', 'tasks', 'variablesCore', 'audio', 'storySummary', 'recorded'];
-	    const DEFAULTS_OFF = ['preview', 'scriptAssistant', 'immersive', 'variablesPanel', 'fourthWall', 'storyOutline', 'novelDraw', 'tts', 'enaPlanner'];
-	    const MODULE_KEYS = ['templateEditor', 'tasks', 'fourthWall', 'variablesCore', 'recorded', 'preview', 'scriptAssistant', 'immersive', 'variablesPanel', 'audio', 'storySummary', 'storyOutline', 'novelDraw', 'tts', 'enaPlanner'];
+      wrapperIframe: 'Wrapperiframe',
+      renderEnabled: 'xiaobaix_render_enabled',
+    };
+    const DEFAULTS_ON = ['storySummary'];
+    const DEFAULTS_OFF = ['storyOutline', 'enaPlanner'];
+    const MODULE_KEYS = ['storySummary', 'storyOutline', 'enaPlanner'];
 	    function setModuleEnabled(key, enabled) {
 	      try {
 	        if (!extension_settings[EXT_ID][key]) extension_settings[EXT_ID][key] = {};
