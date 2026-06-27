@@ -314,6 +314,8 @@
           <div class="card-title">向量知识库</div>
           <div class="form-group">
             <p class="form-hint">是否进入 Ena Planner 请求由“统一模块链”里的 VectorsEnhanced 模块控制。启用后，会把玩家最新输入当作普通查询，直接使用聊天记录管理器当前的任务、阈值、召回数量、查询指令和重排设置。</p>
+            <label class="form-label" for="ep_vk_diagnose_query">诊断查询文本</label>
+            <textarea id="ep_vk_diagnose_query" class="input" rows="4" placeholder="留空时使用输入框草稿或最近一条玩家消息"></textarea>
             <button id="ep_vk_diagnose" class="btn" type="button">诊断聊天记录管理器查询</button>
             <pre id="ep_vk_diagnose_output" class="debug-output"></pre>
           </div>
@@ -1105,9 +1107,10 @@
       $('ep_wb_refresh').addEventListener('click', () => post('xb-ena:worldbooks-request'));
       $('ep_vk_diagnose').addEventListener('click', () => {
         const out = $('ep_vk_diagnose_output');
+        const queryText = String($('ep_vk_diagnose_query')?.value || '').trim();
         out.classList.add('visible');
         out.textContent = '诊断中…';
-        post('xb-ena:debug-vector-knowledge');
+        post('xb-ena:debug-vector-knowledge', { queryText });
       });
       $('ep_ww_diagnose').addEventListener('click', () => {
         activateTab('debug');

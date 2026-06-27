@@ -1542,7 +1542,7 @@ function debugCharForUi() {
     ].join('\n');
 }
 
-async function debugVectorKnowledgeForUi() {
+async function debugVectorKnowledgeForUi(options = {}) {
     const api = await waitForVectorsEnhancedApi('diagnosePlannerQuery');
     if (typeof api !== 'function') {
         const tasks = getVectorsEnhancedTaskOptionsForUi();
@@ -1565,7 +1565,8 @@ async function debugVectorKnowledgeForUi() {
             .reverse()
             .find(m => m?.is_user && !m?.is_system && !m?.extra?.hidden)?.mes
         : '';
-    const testQuery = draftInput || String(lastUserInput || '').trim() || '测试剧情规划向量知识库召回';
+    const explicitQuery = String(options?.queryText || '').trim();
+    const testQuery = explicitQuery || draftInput || String(lastUserInput || '').trim() || '测试剧情规划向量知识库召回';
 
     return await api({
         queryText: testQuery,
@@ -2168,7 +2169,7 @@ async function handleIframeMessage(ev) {
         }
         case 'xb-ena:debug-vector-knowledge': {
             try {
-                const output = await debugVectorKnowledgeForUi();
+                const output = await debugVectorKnowledgeForUi(payload);
                 postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output } });
             } catch (err) {
                 postToIframe(iframe, { type: 'xb-ena:debug-output', payload: { output: String(err?.stack || err?.message || err) } });
