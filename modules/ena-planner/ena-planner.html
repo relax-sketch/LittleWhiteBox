@@ -68,6 +68,12 @@
               </select>
             </div>
             <div class="form-group">
+              <label class="module-toggle" title="开启后，规划完成只写回输入框，不自动点击发送。再次点击酒馆发送按钮或按 Enter 会直接发送已写回文本。">
+                <input id="ep_manual_send_after_planning" type="checkbox">
+                <span>规划后等待手动发送</span>
+              </label>
+            </div>
+            <div class="form-group">
               <label class="form-label">跳过已有规划的输入</label>
               <select id="ep_skip_plot" class="input">
                 <option value="true">是</option>
@@ -109,6 +115,21 @@
       <div id="view-api" class="view">
         <section class="card">
           <div class="card-title">连接设置</div>
+          <div class="form-row">
+            <div class="form-group" style="flex:2;">
+              <label class="form-label">API 配置预设</label>
+              <select id="ep_api_preset_select" class="input">
+                <option value="">-- 选择已保存配置 --</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:3;">
+              <div class="btn-group">
+                <button id="ep_api_preset_save" class="btn btn-p" type="button">保存当前</button>
+                <button id="ep_api_preset_saveas" class="btn" type="button">另存为</button>
+                <button id="ep_api_preset_delete" class="btn btn-del" type="button">删除</button>
+              </div>
+            </div>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">渠道类型</label>
@@ -339,6 +360,12 @@
 
         <section class="card">
           <div class="card-title">聊天与历史</div>
+          <div class="form-group">
+            <label class="module-toggle" title="关闭后，规划 API 原始回复会完整写回输入框；不移除 think，也不按保留标签提取。">
+              <input id="ep_response_filter_enabled" type="checkbox">
+              <span>启用规划输出过滤</span>
+            </label>
+          </div>
           <div class="form-group">
             <label class="form-label">保留的规划输出标签（逗号分隔）</label>
             <input id="ep_keep_tags" type="text" class="input" placeholder="plot, note, plot-log, state">
@@ -784,6 +811,55 @@
       });
     }
 
+    function getCurrentApiConfigFromInputs() {
+      return {
+        channel: $('ep_api_channel').value,
+        prefixMode: $('ep_prefix_mode').value,
+        baseUrl: $('ep_api_base').value.trim(),
+        customPrefix: $('ep_prefix_custom').value.trim(),
+        apiKey: $('ep_api_key').value,
+        model: $('ep_model').value.trim(),
+        stream: toBool($('ep_stream').value, false),
+        temperature: toNum($('ep_temp').value, 1),
+        top_p: toNum($('ep_top_p').value, 1),
+        top_k: Math.floor(toNum($('ep_top_k').value, 0)),
+        presence_penalty: $('ep_pp').value.trim(),
+        frequency_penalty: $('ep_fp').value.trim(),
+        max_tokens: $('ep_mt').value.trim()
+      };
+    }
+
+    function applyApiConfigToInputs(api = {}) {
+      $('ep_api_channel').value = api.channel || 'openai';
+      $('ep_prefix_mode').value = api.prefixMode || 'auto';
+      $('ep_api_base').value = api.baseUrl || '';
+      $('ep_prefix_custom').value = api.customPrefix || '';
+      $('ep_api_key').value = api.apiKey || '';
+      $('ep_model').value = api.model || '';
+      $('ep_stream').value = String(toBool(api.stream, false));
+      $('ep_temp').value = String(toNum(api.temperature, 1));
+      $('ep_top_p').value = String(toNum(api.top_p, 1));
+      $('ep_top_k').value = String(toNum(api.top_k, 0));
+      $('ep_pp').value = api.presence_penalty ?? '';
+      $('ep_fp').value = api.frequency_penalty ?? '';
+      $('ep_mt').value = api.max_tokens ?? '';
+      updatePrefixModeUI();
+    }
+
+    function renderApiPresetSelect(selected = '') {
+      const sel = $('ep_api_preset_select');
+      sel.innerHTML = '<option value="">-- 选择已保存配置 --</option>';
+      const names = Object.keys(cfg?.apiPresets || {});
+      const selectedName = names.includes(selected) ? selected : '';
+      names.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = name === selectedName;
+        sel.appendChild(opt);
+      });
+    }
+
     /* ── Undo ── */
 
     function showUndoBar(name, blocks) {
@@ -957,24 +1033,14 @@
       logs = Array.isArray(cfg.logs) ? cfg.logs : [];
 
       $('ep_enabled').value = String(toBool(cfg.enabled, true));
+      $('ep_manual_send_after_planning').checked = !!cfg.manualSendAfterPlanning;
       $('ep_skip_plot').value = String(toBool(cfg.skipIfPlotPresent, true));
       $('ep_merge_system_msgs').value = String(toBool(cfg.mergeConsecutiveSystemMessages, false));
       $('ep_dice_system_enabled').value = String(toBool(cfg.diceSystem?.enabled, false));
 
       const api = cfg.api || {};
-      $('ep_api_channel').value = api.channel || 'openai';
-      $('ep_prefix_mode').value = api.prefixMode || 'auto';
-      $('ep_api_base').value = api.baseUrl || '';
-      $('ep_prefix_custom').value = api.customPrefix || '';
-      $('ep_api_key').value = api.apiKey || '';
-      $('ep_model').value = api.model || '';
-      $('ep_stream').value = String(toBool(api.stream, false));
-      $('ep_temp').value = String(toNum(api.temperature, 1));
-      $('ep_top_p').value = String(toNum(api.top_p, 1));
-      $('ep_top_k').value = String(toNum(api.top_k, 0));
-      $('ep_pp').value = api.presence_penalty ?? '';
-      $('ep_fp').value = api.frequency_penalty ?? '';
-      $('ep_mt').value = api.max_tokens ?? '';
+      applyApiConfigToInputs(api);
+      renderApiPresetSelect(cfg.activeApiPreset || '');
 
       cfg.worldbookSelection = cfg.worldbookSelection || {};
       $('ep_wb_current_mode').value = cfg.worldbookSelection.currentMode || 'linked';
@@ -984,6 +1050,7 @@
       cfg.westWorldDirector = cfg.westWorldDirector || {};
       $('ep_ww_max_length').value = String(toNum(cfg.westWorldDirector.maxLength, 4000));
       $('ep_plot_n').value = String(toNum(cfg.plotCount, 2));
+      $('ep_response_filter_enabled').checked = cfg.responseFilterEnabled !== false;
       $('ep_keep_tags').value = arrToCsv(cfg.responseKeepTags || ['plot', 'note', 'plot-log', 'state']);
       $('ep_exclude_tags').value = arrToCsv(cfg.chatExcludeTags);
 
@@ -1004,27 +1071,16 @@
       const p = {};
 
       p.enabled = toBool($('ep_enabled').value, true);
+      p.manualSendAfterPlanning = !!$('ep_manual_send_after_planning').checked;
       p.skipIfPlotPresent = toBool($('ep_skip_plot').value, true);
       p.mergeConsecutiveSystemMessages = toBool($('ep_merge_system_msgs').value, false);
       p.diceSystem = {
         enabled: toBool($('ep_dice_system_enabled').value, false),
       };
 
-      p.api = {
-        channel: $('ep_api_channel').value,
-        prefixMode: $('ep_prefix_mode').value,
-        baseUrl: $('ep_api_base').value.trim(),
-        customPrefix: $('ep_prefix_custom').value.trim(),
-        apiKey: $('ep_api_key').value,
-        model: $('ep_model').value.trim(),
-        stream: toBool($('ep_stream').value, false),
-        temperature: toNum($('ep_temp').value, 1),
-        top_p: toNum($('ep_top_p').value, 1),
-        top_k: Math.floor(toNum($('ep_top_k').value, 0)),
-        presence_penalty: $('ep_pp').value.trim(),
-        frequency_penalty: $('ep_fp').value.trim(),
-        max_tokens: $('ep_mt').value.trim()
-      };
+      p.api = getCurrentApiConfigFromInputs();
+      p.apiPresets = cfg?.apiPresets || {};
+      p.activeApiPreset = $('ep_api_preset_select')?.value || '';
 
       p.worldbookSelection = {
         currentMode: $('ep_wb_current_mode').value,
@@ -1044,6 +1100,7 @@
         maxLength: Math.max(0, Math.min(20000, Math.floor(toNum($('ep_ww_max_length').value, 4000)))),
       };
       p.plotCount = Math.max(0, Math.floor(toNum($('ep_plot_n').value, 2)));
+      p.responseFilterEnabled = !!$('ep_response_filter_enabled').checked;
       p.responseKeepTags = normalizeKeepTagsInput($('ep_keep_tags').value);
       p.chatExcludeTags = csvToArr($('ep_exclude_tags').value);
 
@@ -1086,6 +1143,11 @@
       });
 
       $('ep_prefix_mode').addEventListener('change', updatePrefixModeUI);
+      $('ep_manual_send_after_planning').addEventListener('change', scheduleSave);
+      $('ep_response_filter_enabled').addEventListener('change', () => {
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
       $('ep_wb_current_mode').addEventListener('change', () => {
         updateWorldbookModeUI();
         scheduleSave();
@@ -1130,6 +1192,48 @@
       $('ep_model_select').addEventListener('change', () => {
         const val = $('ep_model_select').value;
         if (val) { $('ep_model').value = val; scheduleSave(); }
+      });
+      $('ep_api_preset_select').addEventListener('change', () => {
+        const name = $('ep_api_preset_select').value;
+        cfg.activeApiPreset = name;
+        if (name && cfg?.apiPresets?.[name]) {
+          cfg.api = structuredClone(cfg.apiPresets[name]);
+          applyApiConfigToInputs(cfg.api);
+          setLocalStatus('ep_api_status', `已应用 API 配置：${name}`, 'success');
+        }
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_api_preset_save').addEventListener('click', () => {
+        let name = $('ep_api_preset_select').value || cfg?.activeApiPreset || '';
+        if (!name) name = prompt('API 配置名称');
+        if (!name) return;
+        cfg.apiPresets = cfg.apiPresets || {};
+        cfg.apiPresets[name] = getCurrentApiConfigFromInputs();
+        cfg.activeApiPreset = name;
+        renderApiPresetSelect(name);
+        setLocalStatus('ep_api_status', `已保存 API 配置：${name}`, 'success');
+        scheduleSave();
+      });
+      $('ep_api_preset_saveas').addEventListener('click', () => {
+        const name = prompt('新 API 配置名称');
+        if (!name) return;
+        cfg.apiPresets = cfg.apiPresets || {};
+        cfg.apiPresets[name] = getCurrentApiConfigFromInputs();
+        cfg.activeApiPreset = name;
+        renderApiPresetSelect(name);
+        setLocalStatus('ep_api_status', `已另存 API 配置：${name}`, 'success');
+        scheduleSave();
+      });
+      $('ep_api_preset_delete').addEventListener('click', () => {
+        const name = $('ep_api_preset_select').value;
+        if (!name) return;
+        if (!confirm(`删除 API 配置“${name}”？`)) return;
+        if (cfg?.apiPresets) delete cfg.apiPresets[name];
+        cfg.activeApiPreset = '';
+        renderApiPresetSelect('');
+        setLocalStatus('ep_api_status', `已删除 API 配置：${name}`, 'success');
+        scheduleSave();
       });
       $('ep_keep_tags').addEventListener('change', () => {
         const normalized = normalizeKeepTagsInput($('ep_keep_tags').value);

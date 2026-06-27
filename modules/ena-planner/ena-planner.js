@@ -66,6 +66,8 @@ function getDefaultSettings() {
         enabled: true,
         skipIfPlotPresent: true,
         mergeConsecutiveSystemMessages: false,
+        manualSendAfterPlanning: false,
+        responseFilterEnabled: true,
         diceSystem: {
             enabled: false,
         },
@@ -125,6 +127,8 @@ function getDefaultSettings() {
             frequency_penalty: '',
             max_tokens: ''
         },
+        apiPresets: {},
+        activeApiPreset: '',
 
         // Logs
         logsPersist: true,
@@ -248,6 +252,7 @@ function normalizePromptTemplates(templates, settingsLike = {}) {
 const state = {
     isPlanning: false,
     bypassNextSend: false,
+    awaitingManualSend: false,
     lastInjectedText: '',
     vectorKnowledgeSuccessNotified: false,
     logs: []
@@ -281,6 +286,10 @@ function ensureSettings() {
         }
     }
     deepMerge(s, d);
+    s.manualSendAfterPlanning = !!s.manualSendAfterPlanning;
+    s.responseFilterEnabled = s.responseFilterEnabled !== false;
+    if (!s.apiPresets || typeof s.apiPresets !== 'object' || Array.isArray(s.apiPresets)) s.apiPresets = {};
+    s.activeApiPreset = String(s.activeApiPreset || '');
     if (!Array.isArray(s.responseKeepTags)) s.responseKeepTags = structuredClone(d.responseKeepTags);
     else s.responseKeepTags = normalizeResponseKeepTags(s.responseKeepTags);
     if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
@@ -1347,6 +1356,7 @@ function extractSelectedBlocksInOrder(text, tagNames) {
 }
 
 function filterPlannerForInput(rawFull) {
+    if (ensureSettings().responseFilterEnabled === false) return String(rawFull || '').trim();
     const noThink = stripThinkBlocks(rawFull);
     const tags = ensureSettings().responseKeepTags;
     const selected = extractSelectedBlocksInOrder(noThink, tags);
@@ -1355,6 +1365,7 @@ function filterPlannerForInput(rawFull) {
 }
 
 function filterPlannerPreview(rawPartial) {
+    if (ensureSettings().responseFilterEnabled === false) return String(rawPartial || '');
     return stripThinkBlocks(rawPartial);
 }
 
@@ -1868,6 +1879,12 @@ function shouldInterceptNow() {
     const txt = String(ta.value ?? '').trim();
     if (!txt) return false;
     if (state.bypassNextSend) return false;
+    if (state.awaitingManualSend && txt === String(state.lastInjectedText || '').trim()) {
+        state.awaitingManualSend = false;
+        state.bypassNextSend = true;
+        setTimeout(() => { state.bypassNextSend = false; }, 800);
+        return false;
+    }
     if (s.skipIfPlotPresent && /<plot\b/i.test(txt)) return false;
     return true;
 }
@@ -1904,6 +1921,12 @@ async function doInterceptAndPlanThenSend() {
         const merged = buildFinalInputWithDiceFallback(raw, filtered, diceFallbackPrompt);
         ta.value = merged;
         state.lastInjectedText = merged;
+
+        if (ensureSettings().manualSendAfterPlanning) {
+            state.awaitingManualSend = true;
+            toastInfo('Ena Planner：规划已写回输入框，请确认后手动发送');
+            return;
+        }
 
         state.bypassNextSend = true;
         btn.click();
