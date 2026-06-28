@@ -132,6 +132,14 @@
           </div>
           <div class="form-row">
             <div class="form-group">
+              <label class="form-label">当前 API 绑定破限预设</label>
+              <select id="ep_api_jailbreak_select" class="input">
+                <option value="">-- 不绑定 --</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
               <label class="form-label">渠道类型</label>
               <select id="ep_api_channel" class="input">
                 <option value="openai">OpenAI 兼容</option>
@@ -180,6 +188,34 @@
             <button id="ep_test_conn" class="btn">测试连接</button>
           </div>
           <div id="ep_api_status" class="status-text"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-title">破限区</div>
+          <div class="form-row">
+            <div class="form-group" style="flex:2;">
+              <label class="form-label">破限预设</label>
+              <select id="ep_jailbreak_select" class="input">
+                <option value="">-- 选择已保存文本 --</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:3;">
+              <div class="btn-group">
+                <button id="ep_jailbreak_save" class="btn btn-p" type="button">保存当前</button>
+                <button id="ep_jailbreak_saveas" class="btn" type="button">另存为</button>
+                <button id="ep_jailbreak_delete" class="btn btn-del" type="button">删除</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">顶部文本</label>
+            <textarea id="ep_jailbreak_top" class="input" rows="5" placeholder="绑定后作为统一模块链最上方的内置 system 模块"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">底部文本</label>
+            <textarea id="ep_jailbreak_bottom" class="input" rows="5" placeholder="绑定后作为统一模块链最下方的内置 system 模块"></textarea>
+          </div>
+          <div id="ep_jailbreak_status" class="status-text"></div>
         </section>
 
         <section class="card">
@@ -811,6 +847,86 @@
       });
     }
 
+    function normalizeJailbreakPrompts(raw) {
+      const out = {};
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+      Object.entries(raw).forEach(([rawName, rawValue]) => {
+        const name = String(rawName || '').trim();
+        if (!name) return;
+        if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+          out[name] = {
+            topText: String(rawValue.topText ?? rawValue.top ?? rawValue.before ?? ''),
+            bottomText: String(rawValue.bottomText ?? rawValue.bottom ?? rawValue.after ?? ''),
+          };
+        } else {
+          out[name] = { topText: String(rawValue ?? ''), bottomText: '' };
+        }
+      });
+      return out;
+    }
+
+    function getJailbreakPromptNames() {
+      return Object.keys(cfg?.jailbreakPrompts || {});
+    }
+
+    function getJailbreakPrompt(name) {
+      const item = cfg?.jailbreakPrompts?.[name];
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        return {
+          topText: String(item.topText ?? item.top ?? item.before ?? ''),
+          bottomText: String(item.bottomText ?? item.bottom ?? item.after ?? ''),
+        };
+      }
+      if (item !== undefined) return { topText: String(item ?? ''), bottomText: '' };
+      return { topText: '', bottomText: '' };
+    }
+
+    function renderApiJailbreakSelect(selected = '') {
+      const sel = $('ep_api_jailbreak_select');
+      if (!sel) return;
+      const names = getJailbreakPromptNames();
+      const selectedName = names.includes(selected) ? selected : '';
+      sel.innerHTML = '<option value="">-- 不绑定 --</option>';
+      names.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = name === selectedName;
+        sel.appendChild(opt);
+      });
+    }
+
+    function renderJailbreakSelect(selected = '') {
+      const sel = $('ep_jailbreak_select');
+      if (!sel) return;
+      const names = getJailbreakPromptNames();
+      const selectedName = names.includes(selected) ? selected : '';
+      sel.innerHTML = '<option value="">-- 选择已保存文本 --</option>';
+      names.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        opt.selected = name === selectedName;
+        sel.appendChild(opt);
+      });
+      applyJailbreakPromptToEditor(selectedName);
+    }
+
+    function applyJailbreakPromptToEditor(name = '') {
+      const prompt = getJailbreakPrompt(name);
+      if ($('ep_jailbreak_select')) $('ep_jailbreak_select').value = name || '';
+      if ($('ep_jailbreak_top')) $('ep_jailbreak_top').value = prompt.topText;
+      if ($('ep_jailbreak_bottom')) $('ep_jailbreak_bottom').value = prompt.bottomText;
+    }
+
+    function unbindJailbreakPrompt(name) {
+      if (!name) return;
+      if (cfg?.api?.jailbreakPromptName === name) cfg.api.jailbreakPromptName = '';
+      Object.values(cfg?.apiPresets || {}).forEach(preset => {
+        if (preset?.jailbreakPromptName === name) preset.jailbreakPromptName = '';
+      });
+    }
+
     function getCurrentApiConfigFromInputs() {
       return {
         channel: $('ep_api_channel').value,
@@ -825,7 +941,8 @@
         top_k: Math.floor(toNum($('ep_top_k').value, 0)),
         presence_penalty: $('ep_pp').value.trim(),
         frequency_penalty: $('ep_fp').value.trim(),
-        max_tokens: $('ep_mt').value.trim()
+        max_tokens: $('ep_mt').value.trim(),
+        jailbreakPromptName: $('ep_api_jailbreak_select')?.value || ''
       };
     }
 
@@ -843,6 +960,7 @@
       $('ep_pp').value = api.presence_penalty ?? '';
       $('ep_fp').value = api.frequency_penalty ?? '';
       $('ep_mt').value = api.max_tokens ?? '';
+      renderApiJailbreakSelect(api.jailbreakPromptName || '');
       updatePrefixModeUI();
     }
 
@@ -1039,6 +1157,8 @@
       $('ep_dice_system_enabled').value = String(toBool(cfg.diceSystem?.enabled, false));
 
       const api = cfg.api || {};
+      cfg.jailbreakPrompts = normalizeJailbreakPrompts(cfg.jailbreakPrompts);
+      renderJailbreakSelect(cfg.activeJailbreakPrompt || '');
       applyApiConfigToInputs(api);
       renderApiPresetSelect(cfg.activeApiPreset || '');
 
@@ -1081,6 +1201,8 @@
       p.api = getCurrentApiConfigFromInputs();
       p.apiPresets = cfg?.apiPresets || {};
       p.activeApiPreset = $('ep_api_preset_select')?.value || '';
+      p.jailbreakPrompts = normalizeJailbreakPrompts(cfg?.jailbreakPrompts || {});
+      p.activeJailbreakPrompt = $('ep_jailbreak_select')?.value || '';
 
       p.worldbookSelection = {
         currentMode: $('ep_wb_current_mode').value,
@@ -1204,6 +1326,11 @@
         scheduleSave();
         schedulePreviewRefresh();
       });
+      $('ep_api_jailbreak_select').addEventListener('change', () => {
+        cfg.api = getCurrentApiConfigFromInputs();
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
       $('ep_api_preset_save').addEventListener('click', () => {
         let name = $('ep_api_preset_select').value || cfg?.activeApiPreset || '';
         if (!name) name = prompt('API 配置名称');
@@ -1234,6 +1361,61 @@
         renderApiPresetSelect('');
         setLocalStatus('ep_api_status', `已删除 API 配置：${name}`, 'success');
         scheduleSave();
+      });
+      $('ep_jailbreak_select').addEventListener('change', () => {
+        const name = $('ep_jailbreak_select').value;
+        cfg.activeJailbreakPrompt = name;
+        applyJailbreakPromptToEditor(name);
+        scheduleSave();
+      });
+      $('ep_jailbreak_save').addEventListener('click', () => {
+        let name = $('ep_jailbreak_select').value || cfg?.activeJailbreakPrompt || '';
+        if (!name) name = prompt('破限预设名称');
+        if (!name) return;
+        name = String(name).trim();
+        if (!name) return;
+        cfg.jailbreakPrompts = normalizeJailbreakPrompts(cfg.jailbreakPrompts);
+        cfg.jailbreakPrompts[name] = {
+          topText: $('ep_jailbreak_top').value,
+          bottomText: $('ep_jailbreak_bottom').value,
+        };
+        cfg.activeJailbreakPrompt = name;
+        renderJailbreakSelect(name);
+        renderApiJailbreakSelect($('ep_api_jailbreak_select')?.value || cfg?.api?.jailbreakPromptName || '');
+        setLocalStatus('ep_jailbreak_status', `已保存破限预设：${name}`, 'success');
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_jailbreak_saveas').addEventListener('click', () => {
+        let name = prompt('新破限预设名称');
+        if (!name) return;
+        name = String(name).trim();
+        if (!name) return;
+        cfg.jailbreakPrompts = normalizeJailbreakPrompts(cfg.jailbreakPrompts);
+        cfg.jailbreakPrompts[name] = {
+          topText: $('ep_jailbreak_top').value,
+          bottomText: $('ep_jailbreak_bottom').value,
+        };
+        cfg.activeJailbreakPrompt = name;
+        renderJailbreakSelect(name);
+        renderApiJailbreakSelect($('ep_api_jailbreak_select')?.value || cfg?.api?.jailbreakPromptName || '');
+        setLocalStatus('ep_jailbreak_status', `已另存破限预设：${name}`, 'success');
+        scheduleSave();
+        schedulePreviewRefresh();
+      });
+      $('ep_jailbreak_delete').addEventListener('click', () => {
+        const name = $('ep_jailbreak_select').value;
+        if (!name) return;
+        if (!confirm(`删除破限预设“${name}”？`)) return;
+        cfg.jailbreakPrompts = normalizeJailbreakPrompts(cfg.jailbreakPrompts);
+        delete cfg.jailbreakPrompts[name];
+        unbindJailbreakPrompt(name);
+        cfg.activeJailbreakPrompt = '';
+        renderJailbreakSelect('');
+        renderApiJailbreakSelect(cfg?.api?.jailbreakPromptName || '');
+        setLocalStatus('ep_jailbreak_status', `已删除破限预设：${name}`, 'success');
+        scheduleSave();
+        schedulePreviewRefresh();
       });
       $('ep_keep_tags').addEventListener('change', () => {
         const normalized = normalizeKeepTagsInput($('ep_keep_tags').value);

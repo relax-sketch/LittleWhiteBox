@@ -133,3 +133,28 @@ test('settings UI exposes the master switch and protects the dice prompt editor'
     assert.match(html, /p\.diceSystem\s*=\s*\{\s*enabled:/);
     assert.match(html, /预览.*生成独立骰池/);
 });
+
+test('api-bound jailbreak prompts save two texts and wrap the module chain', async () => {
+    const runtime = await readFile(new URL('../ena-planner.js', import.meta.url), 'utf8');
+    const html = await readFile(new URL('../ena-planner.html', import.meta.url), 'utf8');
+
+    assert.match(runtime, /jailbreakPrompts:\s*\{\}/);
+    assert.match(runtime, /jailbreakPromptName:\s*''/);
+    assert.match(runtime, /topText/);
+    assert.match(runtime, /bottomText/);
+
+    const builderStart = runtime.indexOf('async function buildPlannerMessages');
+    const topInsert = runtime.indexOf("messages.push({ role: 'system', content: jailbreakTop });", builderStart);
+    const chainLoop = runtime.indexOf('for (const module of s.moduleChain || [])', builderStart);
+    const bottomInsert = runtime.indexOf("messages.push({ role: 'system', content: jailbreakBottom });", builderStart);
+
+    assert.ok(builderStart >= 0);
+    assert.ok(topInsert > builderStart && topInsert < chainLoop, 'top jailbreak text must be before module-chain messages');
+    assert.ok(bottomInsert > chainLoop, 'bottom jailbreak text must be after module-chain messages');
+
+    assert.match(html, /id="ep_api_jailbreak_select"/);
+    assert.match(html, /id="ep_jailbreak_top"/);
+    assert.match(html, /id="ep_jailbreak_bottom"/);
+    assert.match(html, /p\.jailbreakPrompts\s*=/);
+    assert.match(html, /jailbreakPromptName:\s*\$\('ep_api_jailbreak_select'\)/);
+});

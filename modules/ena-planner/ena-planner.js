@@ -125,10 +125,14 @@ function getDefaultSettings() {
             top_k: 0,
             presence_penalty: '',
             frequency_penalty: '',
-            max_tokens: ''
+            max_tokens: '',
+            jailbreakPromptName: ''
         },
         apiPresets: {},
         activeApiPreset: '',
+        // Saved jailbreak prompts: { name: { topText, bottomText } }
+        jailbreakPrompts: {},
+        activeJailbreakPrompt: '',
 
         // Logs
         logsPersist: true,
@@ -244,6 +248,37 @@ function normalizePromptTemplates(templates, settingsLike = {}) {
     return out;
 }
 
+function normalizeJailbreakPrompts(prompts) {
+    const out = {};
+    if (!prompts || typeof prompts !== 'object' || Array.isArray(prompts)) return out;
+    for (const [rawName, rawValue] of Object.entries(prompts)) {
+        const name = String(rawName || '').trim();
+        if (!name) continue;
+        let topText = '';
+        let bottomText = '';
+        if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+            topText = String(rawValue.topText ?? rawValue.top ?? rawValue.before ?? '');
+            bottomText = String(rawValue.bottomText ?? rawValue.bottom ?? rawValue.after ?? '');
+        } else {
+            topText = String(rawValue ?? '');
+        }
+        out[name] = { topText, bottomText };
+    }
+    return out;
+}
+
+function getJailbreakPromptByName(settingsLike, name) {
+    const key = String(name || '').trim();
+    if (!key) return { topText: '', bottomText: '' };
+    const prompts = normalizeJailbreakPrompts(settingsLike?.jailbreakPrompts);
+    return prompts[key] || { topText: '', bottomText: '' };
+}
+
+function getActiveJailbreakPrompt(settingsLike) {
+    const s = settingsLike || ensureSettings();
+    return getJailbreakPromptByName(s, s?.api?.jailbreakPromptName);
+}
+
 /**
  * -------------------------
  * Local state
@@ -289,7 +324,17 @@ function ensureSettings() {
     s.manualSendAfterPlanning = !!s.manualSendAfterPlanning;
     s.responseFilterEnabled = s.responseFilterEnabled !== false;
     if (!s.apiPresets || typeof s.apiPresets !== 'object' || Array.isArray(s.apiPresets)) s.apiPresets = {};
+    s.api.jailbreakPromptName = String(s.api.jailbreakPromptName || '');
+    for (const [name, preset] of Object.entries(s.apiPresets)) {
+        if (!preset || typeof preset !== 'object' || Array.isArray(preset)) {
+            delete s.apiPresets[name];
+            continue;
+        }
+        preset.jailbreakPromptName = String(preset.jailbreakPromptName || '');
+    }
     s.activeApiPreset = String(s.activeApiPreset || '');
+    s.jailbreakPrompts = normalizeJailbreakPrompts(s.jailbreakPrompts);
+    s.activeJailbreakPrompt = String(s.activeJailbreakPrompt || '');
     if (!Array.isArray(s.responseKeepTags)) s.responseKeepTags = structuredClone(d.responseKeepTags);
     else s.responseKeepTags = normalizeResponseKeepTags(s.responseKeepTags);
     if (!s.vectorKnowledge || typeof s.vectorKnowledge !== 'object') s.vectorKnowledge = structuredClone(d.vectorKnowledge);
@@ -1748,6 +1793,13 @@ async function buildPlannerMessages(rawUserInput) {
     const worldbook = await renderTemplateAll(worldbookRaw, env, messageVars);
     const userInput = await renderTemplateAll(rawUserInput, env, messageVars);
     const storyOutline = outlineRaw.trim().length > 10 ? await renderTemplateAll(outlineRaw, env, messageVars) : '';
+    const jailbreakPrompt = getActiveJailbreakPrompt(s);
+    const jailbreakTop = String(jailbreakPrompt.topText || '').trim()
+        ? await renderTemplateAll(jailbreakPrompt.topText, env, messageVars)
+        : '';
+    const jailbreakBottom = String(jailbreakPrompt.bottomText || '').trim()
+        ? await renderTemplateAll(jailbreakPrompt.bottomText, env, messageVars)
+        : '';
 
     const builtinMessageFactories = {
         charCard: () => String(charBlock).trim() ? { role: 'system', content: charBlock } : null,
@@ -1762,6 +1814,9 @@ async function buildPlannerMessages(rawUserInput) {
     };
     const promptBlockMap = new Map((s.promptBlocks || []).map(block => [block.id, block]));
     const messages = [];
+    if (String(jailbreakTop).trim()) {
+        messages.push({ role: 'system', content: jailbreakTop });
+    }
     let diceFallbackPrompt = '';
     for (const module of s.moduleChain || []) {
         if (module?.enabled === false) continue;
@@ -1790,6 +1845,9 @@ async function buildPlannerMessages(rawUserInput) {
             messages.push({ role: block.role || 'system', content });
         }
     }
+    if (String(jailbreakBottom).trim()) {
+        messages.push({ role: 'system', content: jailbreakBottom });
+    }
 
     const finalMessages = s.mergeConsecutiveSystemMessages ? mergeConsecutiveSystemMessages(messages) : messages;
 
@@ -1807,6 +1865,9 @@ async function buildPlannerMessages(rawUserInput) {
             westWorldDirectorError,
             cachedSummaryLen: cachedSummary.length,
             plotsRaw,
+            jailbreakPromptName: s.api?.jailbreakPromptName || '',
+            jailbreakTopRaw: jailbreakPrompt.topText || '',
+            jailbreakBottomRaw: jailbreakPrompt.bottomText || '',
             diceFallbackPrompt,
         },
     };
