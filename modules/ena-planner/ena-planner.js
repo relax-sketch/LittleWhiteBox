@@ -6,7 +6,7 @@ import { getVectorConfig } from '../story-summary/data/config.js';
 import { extensionFolderPath } from '../../core/constants.js';
 import { EnaPlannerStorage } from '../../core/server-storage.js';
 import { postToIframe, isTrustedIframeEvent } from '../../core/iframe-messaging.js';
-import { DEFAULT_PROMPT_BLOCKS, BUILTIN_TEMPLATES } from './ena-planner-presets.js';
+import { DEFAULT_PROMPT_BLOCKS, BUILTIN_TEMPLATES, BUILTIN_JAILBREAK_PROMPTS } from './ena-planner-presets.js';
 import {
     DICE_PROMPT_BLOCK_ID,
     buildDiceTurnContext,
@@ -131,7 +131,7 @@ function getDefaultSettings() {
         apiPresets: {},
         activeApiPreset: '',
         // Saved jailbreak prompts: { name: { topText, bottomText } }
-        jailbreakPrompts: {},
+        jailbreakPrompts: structuredClone(BUILTIN_JAILBREAK_PROMPTS),
         activeJailbreakPrompt: '',
 
         // Logs
